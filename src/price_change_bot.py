@@ -19,20 +19,20 @@ STATE_FILE = Path("data/price_change_state.json")
 PREVIEW_FILE = Path("data/price_change_preview.png")
 LOGO_FILE = Path("logo.png")
 
-WIDTH, HEIGHT = 3840, 2160
-BG = (255, 251, 238)
-TEXT = (28, 35, 45)
-MUTED = (102, 108, 116)
-GREEN = (18, 177, 105)
-RED = (224, 56, 76)
-BORDER = (225, 228, 232)
-SOFT_GREEN = (226, 248, 238)
-SOFT_RED = (253, 232, 235)
+WIDTH, HEIGHT = 3200, 2400
+BG = (255, 240, 215)
+TEXT = (22, 28, 34)
+MUTED = (63, 70, 77)
+GREEN = (0, 143, 84)
+RED = (192, 36, 62)
+BORDER = (210, 191, 171)
+SOFT_GREEN = (218, 245, 228)
+SOFT_RED = (252, 224, 229)
 
-LEFT = (70, 330, 1870, 2030)
-RIGHT = (1970, 330, 3770, 2030)
+LEFT = (50, 315, 1570, 2290)
+RIGHT = (1630, 315, 3150, 2290)
 ROWS = 10
-ROW_HEIGHT = 150
+ROW_HEIGHT = 174
 
 
 def fetch_json(url):
@@ -230,59 +230,64 @@ def draw_row(canvas, draw, item, box, direction, assets):
 
     draw.rounded_rectangle(
         (x1, y1, x2, y2),
-        radius=26,
+        radius=25,
         fill=(255, 255, 255),
         outline=BORDER,
         width=3,
     )
-    draw.rectangle((x1, y1, x1 + 14, y2), fill=accent)
+    draw.rectangle((x1, y1, x1 + 15, y2), fill=accent)
 
     paste_contain(
         canvas,
         assets.get(("photo", item["id"])),
-        (x1 + 32, y1 + 20, x1 + 138, y2 - 20),
+        (x1 + 32, y1 + 18, x1 + 150, y2 - 18),
     )
 
-    name_font = fit_font(draw, item["name"], 600, 42, 30, True)
-    draw.text((x1 + 170, y1 + 22), item["name"], font=name_font, fill=TEXT)
+    player_name = item["name"]
+    name_font = fit_font(draw, player_name, 620, 57, 34, True)
+    draw.text((x1 + 180, y1 + 18), player_name, font=name_font, fill=TEXT)
 
-    crest_x = x1 + 172
+    crest_x = x1 + 182
     paste_contain(
         canvas,
         assets.get(("crest", item["team_code"])),
-        (crest_x, y1 + 78, crest_x + 38, y1 + 116),
+        (crest_x, y1 + 98, crest_x + 40, y1 + 138),
     )
-    crest_x += 52
-
     meta = f"{item['team']}  •  {format_price(item['now_cost'])}"
-    meta_font = fit_font(draw, meta, 650, 27, 21, True)
-    draw.text((crest_x, y1 + 78), meta, font=meta_font, fill=MUTED)
+    meta_font = fit_font(draw, meta, 620, 35, 24, True)
+    draw.text((crest_x + 52, y1 + 98), meta, font=meta_font, fill=MUTED)
 
     status = likelihood(item["prediction"])
-    status_font = fit_font(draw, status, 260, 27, 20, True)
+    status_font = fit_font(draw, status, 260, 33, 26, True)
     status_width = text_width(draw, status, status_font)
-    pill_x2 = x2 - 370
-    pill_x1 = pill_x2 - status_width - 46
+    pill_right = x2 - 322
+    pill_left = pill_right - max(status_width + 48, 205)
     draw.rounded_rectangle(
-        (pill_x1, y1 + 30, pill_x2, y1 + 80),
-        radius=22,
+        (pill_left, y1 + 52, pill_right, y1 + 110),
+        radius=25,
         fill=soft,
     )
-    draw.text((pill_x1 + 23, y1 + 38), status, font=status_font, fill=accent)
+    draw.text(
+        (pill_left + (pill_right - pill_left - status_width) // 2, y1 + 62),
+        status,
+        font=status_font,
+        fill=accent,
+    )
 
     target = f"{abs(item['prediction']) * 100:.1f}%"
-    target_font = fit_font(draw, target, 260, 34, 26, True)
+    target_font = fit_font(draw, target, 265, 54, 35, True)
     target_width = text_width(draw, target, target_font)
+    target_right = x2 - 30
     draw.text(
-        (x2 - target_width - 38, y1 + 94),
+        (target_right - target_width, y1 + 58),
         target,
         font=target_font,
         fill=accent,
     )
     draw.text(
-        (x2 - 350, y1 + 103),
-        "% target",
-        font=load_font(19, True),
+        (x2 - 260, y1 + 24),
+        "TARGET %",
+        font=load_font(26, True),
         fill=MUTED,
     )
 
@@ -294,51 +299,82 @@ def create_card(rises, falls, date_text, source_label):
     if LOGO_FILE.exists():
         try:
             logo = Image.open(LOGO_FILE).convert("RGBA")
-            paste_contain(canvas, logo, (65, 45, 390, 235))
+            paste_contain(canvas, logo, (70, 42, 320, 226))
         except Exception as exc:
             print(f"Could not load logo.png: {exc}")
 
-    title = f"PRICE CHANGE PREDICTIONS — {date_text}"
+    title = "PRICE CHANGE PREDICTIONS"
     draw.text(
-        (430, 72),
+        (365, 55),
         title,
-        font=fit_font(draw, title, 3100, 76, 56, True),
+        font=fit_font(draw, title, WIDTH - 430, 80, 57, True),
         fill=TEXT,
     )
     draw.text(
-        (435, 168),
+        (370, 154),
+        date_text,
+        font=load_font(52, True),
+        fill=TEXT,
+    )
+    draw.text(
+        (370, 235),
         "Fantasy Premier League • daily price movement watch",
         font=load_font(34),
         fill=MUTED,
     )
 
     for box, color in ((LEFT, GREEN), (RIGHT, RED)):
-        draw.rounded_rectangle(box, radius=34, fill=(255, 255, 255), outline=BORDER, width=3)
         draw.rounded_rectangle(
-            (box[0], box[1], box[2], box[1] + 112),
+            box,
+            radius=34,
+            fill=(255, 255, 255),
+            outline=BORDER,
+            width=4,
+        )
+        draw.rounded_rectangle(
+            (box[0], box[1], box[2], box[1] + 110),
             radius=34,
             fill=color,
         )
-        draw.rectangle((box[0], box[1] + 70, box[2], box[1] + 112), fill=color)
+        draw.rectangle(
+            (box[0], box[1] + 65, box[2], box[1] + 110),
+            fill=color,
+        )
 
+    section_font = load_font(58, True)
     draw.text(
-        (LEFT[0] + 38, LEFT[1] + 27),
+        (LEFT[0] + 38, LEFT[1] + 18),
         "▲  PRICE RISES",
-        font=load_font(42, True),
+        font=section_font,
         fill=(255, 255, 255),
     )
     draw.text(
-        (RIGHT[0] + 38, RIGHT[1] + 27),
+        (RIGHT[0] + 38, RIGHT[1] + 18),
         "▼  PRICE DROPS",
-        font=load_font(42, True),
+        font=section_font,
         fill=(255, 255, 255),
     )
 
-    header_font = load_font(21, True)
-    for x in (LEFT[0], RIGHT[0]):
-        draw.text((x + 172, 468), "PLAYER / CLUB", font=header_font, fill=MUTED)
-        draw.text((x + 1180, 468), "SURE?", font=header_font, fill=MUTED)
-        draw.text((x + 1450, 468), "% TARGET", font=header_font, fill=MUTED)
+    header_font = load_font(30, True)
+    for column in (LEFT, RIGHT):
+        draw.text(
+            (column[0] + 180, 455),
+            "PLAYER / CLUB",
+            font=header_font,
+            fill=TEXT,
+        )
+        draw.text(
+            (column[0] + 860, 455),
+            "LIKELIHOOD",
+            font=header_font,
+            fill=TEXT,
+        )
+        draw.text(
+            (column[2] - 300, 455),
+            "PREDICTION",
+            font=header_font,
+            fill=TEXT,
+        )
 
     assets = {}
     for item in rises + falls:
@@ -350,23 +386,23 @@ def create_card(rises, falls, date_text, source_label):
             assets[crest_key] = download_image(team_logo_url(item["team_code"]))
 
     for index, item in enumerate(rises):
-        y = 520 + index * ROW_HEIGHT
+        row_top = 520 + index * ROW_HEIGHT
         draw_row(
             canvas,
             draw,
             item,
-            (LEFT[0] + 25, y, LEFT[2] - 25, y + 132),
+            (LEFT[0] + 25, row_top, LEFT[2] - 25, row_top + 160),
             "rise",
             assets,
         )
 
     for index, item in enumerate(falls):
-        y = 520 + index * ROW_HEIGHT
+        row_top = 520 + index * ROW_HEIGHT
         draw_row(
             canvas,
             draw,
             item,
-            (RIGHT[0] + 25, y, RIGHT[2] - 25, y + 132),
+            (RIGHT[0] + 25, row_top, RIGHT[2] - 25, row_top + 160),
             "fall",
             assets,
         )
@@ -376,10 +412,10 @@ def create_card(rises, falls, date_text, source_label):
         f"  •  Price-change check: 00:00 UK"
     )
     draw.text(
-        (80, 2070),
+        (70, 2330),
         footer,
-        font=fit_font(draw, footer, WIDTH - 160, 27, 18, True),
-        fill=MUTED,
+        font=fit_font(draw, footer, WIDTH - 140, 32, 23, True),
+        fill=TEXT,
     )
     return canvas.convert("RGB")
 
