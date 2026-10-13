@@ -1271,6 +1271,96 @@ def create_card(
     )
 
 
+def create_news_page(grouped_players, gameweek):
+    """Render all injury categories on one Discord graphic with a shared color."""
+    sections = [
+        (category, grouped_players[category])
+        for category in CATEGORY_STYLE
+        if grouped_players.get(category)
+    ]
+    if not sections:
+        raise ValueError("No injury news to render")
+
+    header_height = 120
+    subheader_height = 72
+    row_height = 145
+    row_padding = 8
+    section_gap = 10
+    footer_height = 36
+    height = (
+        header_height
+        + sum(
+            section_gap + subheader_height + row_height * len(players) + row_padding
+            for _, players in sections
+        )
+        + footer_height
+    )
+    canvas = Image.new("RGBA", (WIDTH, height), BACKGROUND + (255,))
+    draw = ImageDraw.Draw(canvas)
+
+    # Keep one main header and one gameweek badge for the complete update.
+    draw.rectangle((0, 0, WIDTH, header_height), fill=GREEN + (255,))
+    paste_contain(canvas, load_logo(), (25, 8, 165, 112))
+    title = "FPL VORTEX • INJURY NEWS"
+    title_font = fit_font(draw, title, 1050, 58, min_size=32, bold=True)
+    draw.text((175, 29), title, font=title_font, fill=BLACK)
+    gw_text = f"GW{gameweek}"
+    gw_font = load_font(34, bold=True)
+    gw_width = text_width(draw, gw_text, gw_font)
+    draw.rounded_rectangle(
+        (WIDTH - gw_width - 65, 35, WIDTH - 25, 88),
+        radius=14,
+        fill=(255, 255, 255, 235),
+    )
+    draw.text(
+        (WIDTH - gw_width - 45, 43), gw_text, font=gw_font, fill=BLACK
+    )
+
+    y = header_height
+    for category, players in sections:
+        y += section_gap
+        style = CATEGORY_STYLE[category]
+        draw.rectangle((0, y, WIDTH, y + subheader_height), fill=GREEN + (255,))
+        subtitle = f"{style['symbol']} {style['label']}"
+        subtitle_font = fit_font(draw, subtitle, 760, 42, min_size=28, bold=True)
+        draw.text((30, y + 12), subtitle, font=subtitle_font, fill=BLACK)
+        takeaway = build_takeaway(category)
+        takeaway_font = fit_font(
+            draw, takeaway, 680, 20, min_size=14, bold=True
+        )
+        takeaway_width = text_width(draw, takeaway, takeaway_font)
+        draw.text(
+            (WIDTH - takeaway_width - 30, y + 24),
+            takeaway,
+            font=takeaway_font,
+            fill=BLACK,
+        )
+        y += subheader_height
+
+        # Reuse the existing player-row layout; only the category wrappers change.
+        category_card = create_card(category, players, gameweek)
+        row_area = category_card.crop(
+            (0, header_height, WIDTH, header_height + row_height * len(players) + row_padding)
+        )
+        canvas.alpha_composite(row_area.convert("RGBA"), (0, y))
+        y += row_area.height
+
+    draw.rectangle(
+        (0, height - footer_height, WIDTH, height), fill=(190, 255, 205, 255)
+    )
+    footer_text = "FPL VORTEX  •  Official FPL Data  •  #FPL #FPLNews #FPLInjury"
+    if "SUSPENSION" in grouped_players:
+        footer_text += " #FPLSuspension"
+    footer_font = fit_font(draw, footer_text, WIDTH - 60, 20, min_size=15, bold=True)
+    draw.text(
+        (30, height - footer_height + 5),
+        footer_text,
+        font=footer_font,
+        fill=BLACK,
+    )
+    return canvas.convert("RGB")
+
+
 def send_discord_card(
     card,
     category,
@@ -1290,17 +1380,19 @@ def send_discord_card(
 
     buffer.seek(0)
 
-    style = CATEGORY_STYLE[
-        category
-    ]
-
-    payload = {
-        "username": "FPL Vortex Injury News",
-        "content": (
+    if category is None:
+        message_text = "FPL Vortex • INJURY NEWS"
+    else:
+        style = CATEGORY_STYLE[category]
+        message_text = (
             f"{style['symbol']} "
             f"FPL Vortex • "
             f"{style['label']}"
-        ),
+        )
+
+    payload = {
+        "username": "FPL Vortex Injury News",
+        "content": message_text,
         "allowed_mentions": {
             "parse": [],
         },
@@ -1631,15 +1723,20 @@ def run_preview():
         chosen_category
     ][:6]
 
-    card = create_card(
-        chosen_category,
-        preview_players,
+    preview_groups = {
+        category: grouped[category][:6]
+        for category in order
+        if grouped.get(category)
+    }
+
+    card = create_news_page(
+        preview_groups,
         gameweek,
     )
 
     send_discord_card(
         card,
-        chosen_category,
+        None,
     )
 
     save_x_draft(
@@ -1653,7 +1750,7 @@ def run_preview():
     )
 
     print(
-        f"Category: {chosen_category}"
+        "Categories: " + ", ".join(preview_groups)
     )
 
     print(
@@ -1706,9 +1803,8 @@ def run_test():
         player,
     )
 
-    card = create_card(
-        category,
-        [player],
+    card = create_news_page(
+        {category: [player]},
         current_gameweek(
             data
         ),
@@ -1716,7 +1812,7 @@ def run_test():
 
     send_discord_card(
         card,
-        category,
+        None,
     )
 
     print(
@@ -1873,9 +1969,8 @@ def run_monitor():
             new_record
         )
 
-    # One card per category.
+    # Keep the existing per-category player order and X draft batches.
     for category, players in grouped_changes.items():
-
         players.sort(
             key=lambda player: float(
                 player.get(
@@ -1886,39 +1981,35 @@ def run_monitor():
             reverse=True,
         )
 
-        # Discord remains compact while avoiding
-        # an extremely tall single card.
-        for start in range(
-            0,
-            len(players),
-            8,
-        ):
+    if grouped_changes:
+        card = create_news_page(
+            grouped_changes,
+            gameweek,
+        )
 
-            batch = players[
-                start:start + 8
-            ]
+        send_discord_card(
+            card,
+            None,
+        )
 
-            card = create_card(
-                category,
-                batch,
-                gameweek,
-            )
+        for category, players in grouped_changes.items():
+            for start in range(
+                0,
+                len(players),
+                8,
+            ):
+                batch = players[start:start + 8]
 
-            send_discord_card(
-                card,
-                category,
-            )
+                save_x_draft(
+                    category,
+                    batch,
+                    gameweek,
+                )
 
-            save_x_draft(
-                category,
-                batch,
-                gameweek,
-            )
-
-            print(
-                f"Posted {category} card "
-                f"with {len(batch)} player(s)."
-            )
+        print(
+            "Posted one combined injury-news card "
+            f"with {sum(len(players) for players in grouped_changes.values())} player(s)."
+        )
 
     save_state(
         current
