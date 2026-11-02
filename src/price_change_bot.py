@@ -625,7 +625,10 @@ def main():
         return
 
     if os.getenv("FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true":
-        from branded_renderer import receipt_send
+        try:
+            from .branded_renderer import receipt_send
+        except ImportError:  # python src/price_change_bot.py
+            from branded_renderer import receipt_send
         next_event = next((e["id"] for e in data.get("events", [])
                            if e.get("is_next") and not e.get("finished")), None)
         if next_event is None:
