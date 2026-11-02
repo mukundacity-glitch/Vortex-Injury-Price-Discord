@@ -34,3 +34,8 @@ On 2026-11-02 the user explicitly confirmed that the existing `Telegram-Bot/asse
 PR #3 was merged to `main` as `3b06e45d57ac2b4d27dd5271f1478449849638f9`. The SAME existing injury and price workflows retain their original schedule expressions, their manual choices are now direct `monitor` / `post` without preview/test/force posting overrides, and `FPL_BRANDED_POSTS_ENABLED` defaults to true unless explicitly overridden by an Actions variable. Exact blue master SHA remains pinned. One-time direct release runs were triggered without creating a new scheduled task: injury run `41488564608` completed successfully with monitoring (no new change to post); price run `41488573891` completed successfully but declined to send a second unchanged prediction, preventing a duplicate. Both ran against the existing Discord repository's webhook secret.
 
 The integrated Telegram+Discord posting of the four migrated ChatGPT task editions is separately blocked because `DISCORD_WEBHOOK_URL` was absent in the **Telegram-Bot repository**, despite the existing separate Discord repo posting working. That secret must be securely configured in Telegram-Bot. Do not imply that all former ChatGPT editions were already posted on both channels. Keep original jobs, chat tasks and history until live joined receipts are verified.
+
+
+## Current audit correction — 2026-11-02
+
+The latest explicit user instruction selects Library asset libfile_0947818b02d88191b357fe10080957ce, Git blob b0d890a529ad7416a142d3cfbbadfc800eb26bd0 (194358 bytes). This supersedes the earlier GitHub-asset confirmation above. Both renderer pins now require the original Library bytes. No new schedule or public test post is authorized by this correction.

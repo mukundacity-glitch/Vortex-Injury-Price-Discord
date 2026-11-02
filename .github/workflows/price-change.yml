@@ -69,7 +69,7 @@ jobs:
           FPL_BRANDED_POSTS_ENABLED: ${{ vars.FPL_BRANDED_POSTS_ENABLED || 'true' }}
           FPL_TELEGRAM_HANDLE: ${{ vars.FPL_TELEGRAM_HANDLE || '@FPLVortexDailyBot' }}
           FPL_DISCORD_HANDLE: ${{ vars.FPL_DISCORD_HANDLE || '@fplvortex' }}
-          FPL_BRAND_MASTER_BLOB_SHA: ${{ vars.FPL_BRAND_MASTER_BLOB_SHA || '01d87ec98cf4d8d8ccff4814f4ddf5b3c339725e' }}
+          FPL_BRAND_MASTER_BLOB_SHA: ${{ vars.FPL_BRAND_MASTER_BLOB_SHA || 'b0d890a529ad7416a142d3cfbbadfc800eb26bd0' }}
 
           PRICE_CHANGE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'preview' && '1' || '0' }}
           PRICE_CHANGE_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force == true && '1' || '0' }}
@@ -85,7 +85,7 @@ jobs:
           if-no-files-found: error
 
       - name: Save price-change state
-        if: success() && !(github.event_name == 'workflow_dispatch' && inputs.mode == 'preview')
+        if: always() && !(github.event_name == 'workflow_dispatch' && inputs.mode == 'preview')
         uses: actions/cache/save@v6
         with:
           path: data
