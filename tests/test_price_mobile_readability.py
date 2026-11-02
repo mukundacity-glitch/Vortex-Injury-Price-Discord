@@ -93,7 +93,7 @@ def test_single_discord_post_carries_both_images(monkeypatch):
         assert url == "https://discord.com/api/webhooks/0/unit-test"
         assert kwargs["params"] == {"wait": "true"}
         assert len(kwargs["files"]) == 2
-        assert all(record[2][2] == "image/png" for record in kwargs["files"])
+        assert all(record[1][2] == "image/png" for record in kwargs["files"])
         payload = json.loads(kwargs["data"]["payload_json"])
         assert payload["allowed_mentions"] == {"parse": []}
         calls.append(payload)
