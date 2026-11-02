@@ -70,8 +70,8 @@ def master_slide(session=None):
         raise ValueError("Original branded master has incorrect aspect ratio")
     required_sha = os.getenv("FPL_BRAND_MASTER_BLOB_SHA", "").strip()
     blob_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
-    if not required_sha or blob_sha != required_sha:
-        raise RuntimeError("Approved original master SHA must be configured and match the artwork")
+    if required_sha != APPROVED_MASTER_BLOB_SHA or blob_sha != APPROVED_MASTER_BLOB_SHA:
+        raise RuntimeError("Installed slide does not match user's original 59698.png master; hold post")
     return image.resize((1536, 864), Image.Resampling.LANCZOS)
 
 
