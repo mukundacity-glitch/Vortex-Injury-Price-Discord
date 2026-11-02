@@ -159,7 +159,7 @@ def _one_card(base, title, rows, teams, fixtures, gw, session, handles):
     draw = ImageDraw.Draw(canvas, "RGBA")
     draw.rounded_rectangle((644, 803, 1519, 854), radius=5,
                            fill=(3, 14, 35, 245), outline=(48, 188, 241, 175), width=1)
-    _label(draw, f"TELEGRAM  {handles[0]}", 658, 816, 22, 416,
+    _label(draw, f"TELEGRAM  t.me/{handles[0].lstrip('@')}", 658, 816, 22, 416,
            (47, 218, 246))
     _label(draw, f"DISCORD  {handles[1]}", 1100, 816, 22, 395,
            (169, 172, 253))
