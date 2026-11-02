@@ -6,12 +6,9 @@ on:
       mode:
         description: Choose what to run
         required: true
-        default: preview
+        default: monitor
         type: choice
         options:
-          - preview
-          - test
-          - baseline
           - monitor
 
   schedule:
