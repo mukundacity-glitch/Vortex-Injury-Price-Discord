@@ -10,12 +10,6 @@ on:
         type: choice
         options:
           - post
-          - preview
-      force:
-        description: Force a post even if today's card is unchanged
-        required: false
-        default: false
-        type: boolean
 
   schedule:
     # Final daily snapshot before the 00:00 UK price-change window.
