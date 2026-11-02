@@ -164,8 +164,9 @@ def _existing_edition(prefix):
             raise ValueError("Receipt ledger must be an object")
     except (OSError, ValueError) as exc:
         raise RuntimeError("Cannot verify prior Discord delivery receipts") from exc
-    return any(key.startswith(prefix) and value.get("message_id")
-               for key, value in prior.items())
+    return {key for key, value in prior.items()
+            if key.startswith(prefix) and isinstance(value, dict)
+            and value.get("message_id")}
 
 
 def _opponent(fixture, club, teams):
@@ -183,15 +184,12 @@ def run_edition(bootstrap, future_fixtures, now=None, *, session=None):
     date_et = now.astimezone(ET).date().isoformat()
     gw, deadline = actionable_gw(bootstrap, now)
     completed = _latest_finished(bootstrap)
-    season = next((e.get("name") for e in bootstrap.get("events", [])
-                   if e.get("id") == gw), None)
-    # The FPL bootstrap events don't always contain a season label; use an
-    # explicit configured year, never infer a current player season from a photo.
+    # This bot is explicitly scoped to the current 2026/27 season. The
+    # duplicate key intentionally excludes the calendar day: identical
+    # advice is NEVER republished merely because it is tomorrow.
     season_id = "2026-27"
-    prefix = f"discorddaily:{season_id}:GW{gw}:{date_et}:{edition}:"
-    if _existing_edition(prefix):
-        print(f"Discord daily {edition} already confirmed delivered; no repost")
-        return "already-delivered"
+    prefix = f"discorddaily:{season_id}:GW{gw}:{edition}:"
+    prior_versions = _existing_edition(prefix)
 
     client = session or requests.Session()
     seen_elsewhere = _outside_already_published(client, date_et)
@@ -207,6 +205,13 @@ def run_edition(bootstrap, future_fixtures, now=None, *, session=None):
         try:
             last = _verified_last_gw(client, player["id"], completed)
             if not last:
+                continue
+            # A MONITOR risk needs evidence: an actual FPL flag or a short
+            # appearance in the last completed Gameweek.
+            if (edition == "decision-watch" and player.get("status") == "a"
+                    and last["minutes"] >= 60):
+                continue
+            if (edition != "decision-watch" and last["minutes"] < 60):
                 continue
             # Verify live-authentic portrait AND crest before selecting a card.
             branded._current_verified_media(client, int(player["code"]), "photo")
@@ -233,17 +238,6 @@ def run_edition(bootstrap, future_fixtures, now=None, *, session=None):
          "action": f"{item['action']} • GW{completed} {item['last']['points']} pts"}
         for item in picks
     ]
-    caption = "\n".join([
-        f"GW{gw} | {headline}",
-        f"{player_name}: {first['last']['points']} pts, "
-        f"{first['last']['minutes']} mins in GW{completed}.",
-        f"Next: {opponent} ({ha}), FDR {first['fdr']}; "
-        f"deadline {deadline[:10]}.",
-        f"{action} {player_name} — check final availability before locking moves.",
-        f"#FPL #FPLCommunity #FPLVortex #GW{gw}",
-    ])
-    if len(caption.splitlines()) != 5:
-        raise AssertionError("Five-line caption violated")
     source_version = sha256(json.dumps({
         "fixture": [item["fixture"].get("id") for item in picks],
         "profiles": [(item["id"], item["player"].get("status"),
@@ -251,7 +245,35 @@ def run_edition(bootstrap, future_fixtures, now=None, *, session=None):
                       item["last"]["points"], item["last"]["minutes"])
                      for item in picks],
     }, sort_keys=True).encode()).hexdigest()[:20]
-    identity = prefix + source_version
+    identity = prefix + ":".join(str(i["id"]) for i in picks) + ":" + source_version
+    if identity in prior_versions:
+        print(f"Unchanged GW{gw} {edition} already delivered; no repeat")
+        return "already-delivered"
+    if prior_versions:
+        headline = "UPDATED • " + headline
+
+    flag = {"a": "FPL available", "d": "FPL doubt", "i": "FPL injured",
+            "s": "FPL suspended", "u": "FPL unavailable"}
+    if edition == "decision-watch":
+        evidence = (f"{player_name}: {flag.get(target.get('status'), 'FPL flag')}; "
+                    f"{first['last']['minutes']} GW{completed} mins.")
+    elif edition == "transfer-advice":
+        net = int(_num(target.get("transfers_in_event")) -
+                  _num(target.get("transfers_out_event")))
+        evidence = (f"{player_name}: net transfers {net:+,}; "
+                    f"{first['last']['points']} GW{completed} pts.")
+    else:
+        evidence = (f"{player_name}: {first['last']['points']} pts, "
+                    f"{first['last']['minutes']} mins in GW{completed}.")
+    caption = "\n".join([
+        f"GW{gw} | {headline}",
+        evidence,
+        f"Next: {opponent} ({ha}), FDR {first['fdr']}; deadline {deadline[:10]}.",
+        f"{action} {player_name}; check team news. Follow FPL VORTEX.",
+        f"#FPL #FPLCommunity #FPLVortex #GW{gw}",
+    ])
+    if len(caption.splitlines()) != 5:
+        raise AssertionError("Five-line caption violated")
 
     # This will refuse any mismatched blue master, nonexistent team badge,
     # unavailable player photograph, or missing verified footer handle.
