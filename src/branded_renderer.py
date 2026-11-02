@@ -21,8 +21,8 @@ import requests
 
 CANONICAL_MASTER = ("https://raw.githubusercontent.com/mukundacity-glitch/"
                     "Telegram-Bot/main/assets/references/brand_background.png")
-# Exact SHA-1 Git blob of approved 59698.png supplied by the user.
-APPROVED_MASTER_BLOB_SHA = "b0d890a529ad7416a142d3cfbbadfc800eb26bd0"
+# Exact SHA-1 Git blob of the user-confirmed existing original master already in Telegram-Bot.
+APPROVED_MASTER_BLOB_SHA = "01d87ec98cf4d8d8ccff4814f4ddf5b3c339725e"
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
 FDR = {1: (62, 224, 147), 2: (122, 206, 172), 3: (244, 209, 112),
@@ -71,7 +71,7 @@ def master_slide(session=None):
     required_sha = os.getenv("FPL_BRAND_MASTER_BLOB_SHA", "").strip()
     blob_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
     if required_sha != APPROVED_MASTER_BLOB_SHA or blob_sha != APPROVED_MASTER_BLOB_SHA:
-        raise RuntimeError("Installed slide does not match user's original 59698.png master; hold post")
+        raise RuntimeError("Installed slide differs from user-confirmed Telegram-Bot master; hold post")
     return image.resize((1536, 864), Image.Resampling.LANCZOS)
 
 
