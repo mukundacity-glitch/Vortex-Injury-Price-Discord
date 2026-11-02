@@ -10,7 +10,7 @@ from src import discord_daily_editorial as daily
 
 def now_at(hour):
     # November 2, 2026 is EST (UTC-05:00).
-    return datetime(2026, 11, 2, hour + 5, 7, tzinfo=timezone.utc)
+    return datetime(2026, 11, 2, hour, 7, tzinfo=daily.ET).astimezone(timezone.utc)
 
 
 def fixture_data():
