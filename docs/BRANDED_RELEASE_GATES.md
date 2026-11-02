@@ -25,3 +25,6 @@ The user-supplied original blue FPL VORTEX master is `59698.png`, Git blob SHA-1
 5. Only after all checks, choose one authoritative publisher per news topic, switch off redundant schedules *without deleting any bots, files, archives or messages*, and retain rollback toggles.
 
 None of these manual/live publishing gates were executed by this draft PR. The existing production mode is unchanged.
+
+## User clarification: approved slide exists in GitHub
+On 2026-11-02 the user explicitly confirmed that the existing `Telegram-Bot/assets/references/brand_background.png` in the `upgrade/unified-telegram-discord-news` branch is their desired slide. Its verified Git blob SHA-1 is `01d87ec98cf4d8d8ccff4814f4ddf5b3c339725e` (172062 bytes). The other in-chat PNG file (`59698.png`, blob `b0d890a529ad7416a142d3cfbbadfc800eb26bd0`) is a distinct binary. **Use the user-confirmed GitHub master without asking for a re-upload.** Renderer fingerprints were updated to match the confirmed GitHub master. Prior guidance in this document requiring re-upload of `59698.png` is superseded. Actual Telegram+Discord delivery/staging configuration and end-to-end duplicate safety remain separate release gates.
