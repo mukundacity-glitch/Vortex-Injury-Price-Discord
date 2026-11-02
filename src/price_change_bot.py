@@ -9,6 +9,11 @@ from zoneinfo import ZoneInfo
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
+try:
+    from .price_graphics import render_price_pages
+except ImportError:  # python src/price_change_bot.py from GitHub Actions
+    from price_graphics import render_price_pages
+
 FPL_API_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
 PREDICTION_URL = "https://livefpl.us/api/prices.json"
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
@@ -434,35 +439,126 @@ def save_state(state):
     STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
-def send_discord(card, date_text):
+def _verified_image_urls(kind, code):
+    """Official, current image sources only; fallback fixes recurring PL 403s."""
+    if code is None:
+        return []
+    value = str(code).removesuffix(".jpg").removeprefix("p")
+    if not value.isdigit():
+        return []
+    if kind == "photo":
+        return [
+            f"https://images.fantasy.premierleague.com/premierleague/photos/players/250x250/p{value}.png",
+            f"https://resources.premierleague.com/premierleague25/photos/players/250x250/{value}.png",
+            f"https://resources.premierleague.com/premierleague25/photos/players/250x250/p{value}.png",
+            f"https://resources.premierleague.com/premierleague/photos/players/250x250/p{value}.png",
+        ]
+    if kind == "crest":
+        return [
+            f"https://resources.premierleague.com/premierleague/badges/70/t{value}.png",
+            f"https://resources.premierleague.com/premierleague/badges/t{value}.png",
+        ]
+    raise ValueError("Unexpected asset type")
+
+
+def load_price_assets(rises, falls, *, client=None):
+    """Proportional verified photos and crests for PRICE POST only.
+
+    Unavailable copyrighted images are omitted, NEVER invented. Source data
+    fields, club assignment, and candidate rankings remain unchanged.
+    """
+    session = client or requests.Session()
+    output = {}
+    for item in rises + falls:
+        for category, identity, data_code in (
+            ("photo", item.get("id"), item.get("photo")),
+            ("crest", item.get("team_code"), item.get("team_code")),
+        ):
+            key = (category, identity)
+            if key in output:
+                continue
+            found = None
+            for url in _verified_image_urls(category, data_code):
+                try:
+                    response = session.get(
+                        url, timeout=6,
+                        headers={"User-Agent": "FPL-Vortex-Price-Change-Bot/2.0",
+                                 "Accept": "image/png,image/*"})
+                    if response.status_code != 200 or not response.headers.get(
+                            "Content-Type", "").startswith("image/"):
+                        continue
+                    if not (250 <= len(response.content) <= 4_000_000):
+                        continue
+                    with Image.open(BytesIO(response.content)) as original:
+                        original.load()
+                        if original.width < 45 or original.height < 45:
+                            continue
+                        found = original.convert("RGBA")
+                    break
+                except (requests.RequestException, OSError, ValueError):
+                    continue
+            output[key] = found
+    return output
+
+
+def create_price_pages(rises, falls, date_text, source_label, *, assets=None):
+    """Render all top-ten rises and drops as two single-column portrait pages."""
+    # Values already come from the existing candidate selection; no new
+    # player rankings, predictions, stats or team names are fabricated.
+    display_rises = [dict(item, price_label=format_price(item["now_cost"]))
+                     for item in rises]
+    display_falls = [dict(item, price_label=format_price(item["now_cost"]))
+                     for item in falls]
+    logo = None
+    if LOGO_FILE.is_file():
+        try:
+            with Image.open(LOGO_FILE) as source:
+                logo = source.convert("RGBA")
+        except OSError:
+            pass
+    media = assets if assets is not None else load_price_assets(rises, falls)
+    return render_price_pages(display_rises, display_falls,
+                              date_text, source_label, media, logo)
+
+
+def send_discord(pages, date_text):
+    """Attach both legible price pages in ONE original Discord post."""
     if not DISCORD_WEBHOOK_URL:
         raise RuntimeError("DISCORD_WEBHOOK_URL secret is missing")
-
-    buffer = BytesIO()
-    card.save(buffer, format="PNG", optimize=True)
-    buffer.seek(0)
-
-    response = requests.post(
-        DISCORD_WEBHOOK_URL,
-        data={
-            "payload_json": json.dumps(
-                {
-                    "username": "FPL Vortex Price Changes",
-                    "content": f"📈 **FPL VORTEX • PRICE CHANGE PREDICTIONS** — {date_text}",
-                    "allowed_mentions": {"parse": []},
-                }
-            )
-        },
-        files={
-            "files[0]": (
-                "fpl_vortex_price_changes_4k.png",
-                buffer,
-                "image/png",
-            )
-        },
-        timeout=30,
-    )
-    response.raise_for_status()
+    if not pages or len(pages) > 2:
+        raise RuntimeError("Expected one or two complete price report images")
+    buffers = []
+    try:
+        files = []
+        for i, card in enumerate(pages):
+            buffer = BytesIO()
+            card.save(buffer, format="PNG", optimize=True)
+            buffer.seek(0)
+            buffers.append(buffer)
+            name = "rises" if i == 0 else "drops"
+            files.append((f"files[{i}]", (
+                f"fpl_vortex_price_change_{name}.png", buffer, "image/png")))
+        response = requests.post(
+            DISCORD_WEBHOOK_URL,
+            params={"wait": "true"},
+            data={"payload_json": json.dumps({
+                "username": "FPL Vortex Price Changes",
+                "content": ("📈 **FPL VORTEX • PRICE CHANGE PREDICTIONS** — "
+                            f"{date_text}\nOpen each image for a readable "
+                            "top-10 price-rise or price-drop report."),
+                "allowed_mentions": {"parse": []},
+            })},
+            files=files,
+            timeout=50,
+        )
+        response.raise_for_status()
+        message_id = response.json().get("id")
+        if not message_id:
+            raise RuntimeError("Discord price report did not return a message ID")
+        return str(message_id)
+    finally:
+        for buffer in buffers:
+            buffer.close()
 
 
 def main():
@@ -489,62 +585,74 @@ def main():
         else "official FPL transfer-data fallback"
     )
 
-    card = create_card(rises, falls, date_text, source_label)
-    PREVIEW_FILE.parent.mkdir(parents=True, exist_ok=True)
-    card.save(PREVIEW_FILE, format="PNG", optimize=True)
-
+    # Version the new layout independently of numerical market movement.
+    # Existing same-day state must not silently block the first readable
+    # edition, while repeated copies of the new art are still deduplicated.
     signature_payload = {
         "date": date_text,
+        "visual_version": "price-mobile-v2-two-portrait-slides",
         "rises": [(x["id"], round(x["prediction"], 4)) for x in rises],
         "falls": [(x["id"], round(x["prediction"], 4)) for x in falls],
     }
     signature = hashlib.sha256(
         json.dumps(signature_payload, sort_keys=True).encode()
     ).hexdigest()
-
     state = load_state()
     if not FORCE_POST and state.get("date") == date_text and state.get("signature") == signature:
-        print("Price-change prediction is unchanged; no duplicate post sent.")
-        return
-
-    if DRY_RUN:
-        print(f"Preview created: {PREVIEW_FILE}")
-        print("Rises:", ", ".join(item["name"] for item in rises))
-        print("Falls:", ", ".join(item["name"] for item in falls))
+        print("Readable price-change report unchanged; no duplicate post sent.")
         return
 
     if os.getenv("FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true":
-        # Only genuine independent LiveFPL predictions are represented as
-        # price forecast progress. Heuristic transfer-volume fallback remains
-        # in legacy mode but is not labeled a verified market forecast here.
-        trustworthy = [x for x in (rises + falls)
-                       if x.get("source") == "LiveFPL predictor"]
-        if not predictor or not trustworthy:
-            raise RuntimeError("Price forecast feed unverified; hold branded post")
-        from branded_renderer import render_batches, receipt_send
-        upcoming = fetch_json("https://fantasy.premierleague.com/api/fixtures/")
-        records = [dict(item, action="MONITOR") for item in trustworthy]
-        artwork = render_batches(
-            "FPL PRICE MOVEMENT • WATCH", records, data, upcoming)
-        # Version is derived from actual provider values, not date/time
-        # or scheduled run identity. Repeated run cannot resend old content.
-        model = [(x["id"], round(x["prediction"], 4)) for x in trustworthy]
-        version = hashlib.sha256(json.dumps(sorted(model)).encode()).hexdigest()[:24]
+        # Keep the existing verified-model gate. Transfer volume alone is NOT
+        # an independent price-rise prediction and must not be presented as one.
+        trustworthy_rises = [x for x in rises if x.get("source") == "LiveFPL predictor"]
+        trustworthy_falls = [x for x in falls if x.get("source") == "LiveFPL predictor"]
+        if not predictor or not trustworthy_rises + trustworthy_falls:
+            raise RuntimeError("Independent price forecast feed unavailable; hold post")
+        chosen_rises, chosen_falls = trustworthy_rises, trustworthy_falls
+    else:
+        chosen_rises, chosen_falls = rises, falls
+
+    pages = create_price_pages(chosen_rises, chosen_falls, date_text, source_label)
+    PREVIEW_FILE.parent.mkdir(parents=True, exist_ok=True)
+    for index, page in enumerate(pages):
+        suffix = "rises" if index == 0 and chosen_rises else "drops"
+        page.save(PREVIEW_FILE.with_name(f"price_change_{suffix}.png"),
+                  format="PNG", optimize=True)
+
+    if DRY_RUN:
+        print(f"Rendered {len(pages)} legible price-change page(s), not published")
+        return
+
+    if os.getenv("FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true":
+        try:
+            from .branded_renderer import receipt_send
+        except ImportError:  # python src/price_change_bot.py
+            from branded_renderer import receipt_send
         next_event = next((e["id"] for e in data.get("events", [])
                            if e.get("is_next") and not e.get("finished")), None)
         if next_event is None:
             raise RuntimeError("No verified upcoming gameweek")
+        # Persist a new topic version, not the legacy (unreadable) artwork.
+        model = [(x["id"], round(x["prediction"], 4))
+                 for x in chosen_rises + chosen_falls]
+        version = hashlib.sha256(json.dumps(
+            {"model": sorted(model), "layout": "price-mobile-v2"}, sort_keys=True
+        ).encode()).hexdigest()[:24]
         caption = (
-            f"GW{next_event}: {len(trustworthy)} verified price-watch candidates.\n"
-            "MONITOR predicted changes; forecasts are not guaranteed.\n"
-            "Confirm transfers and selling values before moving.\n"
-            "#FPL #FPLVortex #PriceChanges #Transfers")
+            f"GW{next_event}: verified price-change watchlist.\n"
+            "View both high-contrast pages: rises and drops.\n"
+            "Progress % is an indicator, NOT a probability or confirmed change.\n"
+            "#FPL #FPLVortex #PriceChanges #Transfers"
+        )
         message_id, published = receipt_send(
-            artwork, caption, f"price:{next_event}:{version}",
+            pages, caption, f"price:{next_event}:{version}",
             DISCORD_WEBHOOK_URL, Path("data/branded_discord_deliveries.json"))
-        print(f"Branded price forecast delivery={published}; receipt ID={message_id}")
+        print(f"Readable price watch delivery={published}; receipt ID={message_id}")
     else:
-        send_discord(card, date_text)
+        message_id = send_discord(pages, date_text)
+        print(f"Readable two-page price report posted, Discord message ID={message_id}")
+
     save_state(
         {
             "date": date_text,
