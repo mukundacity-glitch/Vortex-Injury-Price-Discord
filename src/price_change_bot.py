@@ -513,7 +513,38 @@ def main():
         print("Falls:", ", ".join(item["name"] for item in falls))
         return
 
-    send_discord(card, date_text)
+    if os.getenv("FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true":
+        # Only genuine independent LiveFPL predictions are represented as
+        # price forecast progress. Heuristic transfer-volume fallback remains
+        # in legacy mode but is not labeled a verified market forecast here.
+        trustworthy = [x for x in (rises + falls)
+                       if x.get("source") == "LiveFPL predictor"]
+        if not predictor or not trustworthy:
+            raise RuntimeError("Price forecast feed unverified; hold branded post")
+        from branded_renderer import render_batches, receipt_send
+        upcoming = fetch_json("https://fantasy.premierleague.com/api/fixtures/")
+        records = [dict(item, action="MONITOR") for item in trustworthy]
+        artwork = render_batches(
+            "FPL PRICE MOVEMENT • WATCH", records, data, upcoming)
+        # Version is derived from actual provider values, not date/time
+        # or scheduled run identity. Repeated run cannot resend old content.
+        model = [(x["id"], round(x["prediction"], 4)) for x in trustworthy]
+        version = hashlib.sha256(json.dumps(sorted(model)).encode()).hexdigest()[:24]
+        next_event = next((e["id"] for e in data.get("events", [])
+                           if e.get("is_next") and not e.get("finished")), None)
+        if next_event is None:
+            raise RuntimeError("No verified upcoming gameweek")
+        caption = (
+            f"GW{next_event}: {len(trustworthy)} verified price-watch candidates.\\n"
+            "MONITOR predicted changes; forecasts are not guaranteed.\\n"
+            "Confirm transfers and selling values before moving.\\n"
+            "#FPL #FPLVortex #PriceChanges #Transfers")
+        message_id, published = receipt_send(
+            artwork, caption, f"price:{next_event}:{version}",
+            DISCORD_WEBHOOK_URL, Path("data/branded_discord_deliveries.json"))
+        print(f"Branded price forecast delivery={published}; receipt ID={message_id}")
+    else:
+        send_discord(card, date_text)
     save_state(
         {
             "date": date_text,
@@ -521,7 +552,7 @@ def main():
             "posted_at": datetime.now(timezone.utc).isoformat(),
         }
     )
-    print("Price-change prediction card posted successfully.")
+    print("Price-change prediction card processed successfully.")
 
 
 if __name__ == "__main__":
