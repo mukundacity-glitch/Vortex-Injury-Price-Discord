@@ -58,7 +58,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TEST_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'monitor' }}
         run: |
-          python src/injury_bot.py
+          python -m src.injury_bot
 
       - name: Save injury state
         if: success()
