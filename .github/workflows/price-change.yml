@@ -11,6 +11,10 @@ on:
         options:
           - post
 
+  # A direct, data-validated release-triggered post attempt; no test mode.
+  push:
+    branches: [main]
+    paths: ['.github/workflows/price-change.yml']
   schedule:
     # Final daily snapshot before the 00:00 UK price-change window.
     - cron: "45 23 * * *"
@@ -25,6 +29,7 @@ concurrency:
 
 jobs:
   price-change:
+    if: ${{ github.event_name != 'push' || contains(github.event.head_commit.message, '[FPL-DISCORD-PRICE-LIVE]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
