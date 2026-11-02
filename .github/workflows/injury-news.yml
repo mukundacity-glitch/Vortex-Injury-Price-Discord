@@ -11,6 +11,10 @@ on:
         options:
           - monitor
 
+  # A direct, data-validated release-triggered post attempt; no test mode.
+  push:
+    branches: [main]
+    paths: ['.github/workflows/injury-news.yml']
   schedule:
     - cron: "7,22,37,52 * * * *"
 
@@ -23,6 +27,7 @@ concurrency:
 
 jobs:
   injury-news:
+    if: ${{ github.event_name != 'push' || contains(github.event.head_commit.message, '[FPL-DISCORD-INJURY-LIVE]') }}
     runs-on: ubuntu-latest
 
     steps:
