@@ -10,12 +10,6 @@ on:
         type: choice
         options:
           - post
-          - preview
-      force:
-        description: Force a post even if today's card is unchanged
-        required: false
-        default: false
-        type: boolean
 
   schedule:
     # Final daily snapshot before the 00:00 UK price-change window.
@@ -46,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install requests Pillow
+          python -m pip install requests Pillow pytest
 
       - name: Restore price-change state
         uses: actions/cache/restore@v6
@@ -59,9 +53,19 @@ jobs:
       - name: Create data directory
         run: mkdir -p data
 
+      - name: Validate original-branded graphics and dedup offline
+        run: python -m pytest -q tests
+
       - name: Run FPL Vortex Price Change Engine
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # Mandatory original master, handles and honest-source rules are
+          # opt-in until the real config is verified in staging.
+          FPL_BRANDED_POSTS_ENABLED: ${{ vars.FPL_BRANDED_POSTS_ENABLED || 'false' }}
+          FPL_TELEGRAM_HANDLE: ${{ vars.FPL_TELEGRAM_HANDLE || '@FPLVortexDailyBot' }}
+          FPL_DISCORD_HANDLE: ${{ vars.FPL_DISCORD_HANDLE || '@fplvortex' }}
+          FPL_BRAND_MASTER_BLOB_SHA: ${{ vars.FPL_BRAND_MASTER_BLOB_SHA || '01d87ec98cf4d8d8ccff4814f4ddf5b3c339725e' }}
+
           PRICE_CHANGE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'preview' && '1' || '0' }}
           PRICE_CHANGE_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force == true && '1' || '0' }}
         run: |

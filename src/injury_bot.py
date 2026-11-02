@@ -1982,15 +1982,43 @@ def run_monitor():
         )
 
     if grouped_changes:
-        card = create_news_page(
-            grouped_changes,
-            gameweek,
-        )
+        # Existing previews, draft generation and snapshot logic stay intact.
+        # The new original-blue branded path is opt-in: no surprise change to
+        # existing Discord production while template/handles remain unverified.
+        if os.getenv("FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true":
+            import hashlib
+            from .branded_renderer import render_batches, receipt_send
+            all_changed = []
+            for section, affected in grouped_changes.items():
+                for item in affected:
+                    all_changed.append(dict(item, action="MONITOR", category=section))
+            identity_fields = [(p.get("name"), p.get("team_code"),
+                                p.get("status"), p.get("chance_next"),
+                                p.get("news")) for p in all_changed]
+            canonical = json.dumps(sorted(identity_fields, key=str), sort_keys=True)
+            version = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
+            receipt_key = f"injury:{gameweek}:{version}"
+            artwork = render_batches(
+                "PLAYER STATUS • MANAGER WATCH", all_changed, data, fixtures)
+            description = (
+                f"GW{gameweek}: {len(all_changed)} confirmed FPL status changes.\n"
+                "MONITOR availability and minutes before acting.\n"
+                "Review fixtures and the next deadline before transfers.\n"
+                "#FPL #FPLVortex #TeamNews #Availability")
+            message_id, published = receipt_send(
+                artwork, description, receipt_key, DISCORD_WEBHOOK_URL,
+                Path("data/branded_discord_deliveries.json"))
+            print(f"Verified branded status delivery: {published}; receipt ID={message_id}")
+        else:
+            card = create_news_page(
+                grouped_changes,
+                gameweek,
+            )
 
-        send_discord_card(
-            card,
-            None,
-        )
+            send_discord_card(
+                card,
+                None,
+            )
 
         for category, players in grouped_changes.items():
             for start in range(
