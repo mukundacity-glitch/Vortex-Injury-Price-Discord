@@ -84,6 +84,37 @@ def actual_image(session, url):
         return photo.convert("RGBA")
 
 
+def _current_verified_media(session, code, category):
+    """Try genuine Premier League/FPL image hosts; never invent a crest/photo."""
+    if not isinstance(code, int) or code <= 0:
+        raise RuntimeError("No official current player/club media ID")
+    if category == "photo":
+        urls = [
+            f"https://resources.premierleague.com/premierleague25/photos/players/250x250/{code}.png",
+            f"https://resources.premierleague.com/premierleague25/photos/players/110x140/{code}.png",
+            f"https://resources.premierleague.com/premierleague25/photos/players/250x250/p{code}.png",
+            f"https://images.fantasy.premierleague.com/premierleague/photos/players/250x250/p{code}.png",
+            f"https://resources.premierleague.com/premierleague/photos/players/250x250/p{code}.png",
+        ]
+    elif category == "crest":
+        urls = [
+            f"https://resources.premierleague.com/premierleague/badges/70/t{code}.png",
+            f"https://resources.premierleague.com/premierleague/badges/50/t{code}.png",
+            f"https://resources.premierleague.com/premierleague/badges/t{code}.png",
+        ]
+    else:
+        raise ValueError("Unsupported verified media category")
+    errors = []
+    for url in urls:
+        try:
+            image = actual_image(session, url)
+            if image.width >= 48 and image.height >= 48:
+                return image
+        except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
+            errors.append(type(exc).__name__)
+    raise RuntimeError(f"Verified current {category} media missing; affected edition held")
+
+
 def next_five(fixtures, team_id, teams, gw):
     rows = []
     for event in range(gw, min(39, gw + 5)):
@@ -126,8 +157,8 @@ def _one_card(base, title, rows, teams, fixtures, gw, session, handles):
         y = 184 + index*176
         draw.rounded_rectangle((56, y, 1476, y+164), radius=10,
                                fill=(4, 29, 63, 242), outline=(51, 117, 178, 185), width=2)
-        photo = actual_image(session, f"https://resources.premierleague.com/premierleague/photos/players/250x250/p{p['code']}.png")
-        crest = actual_image(session, f"https://resources.premierleague.com/premierleague/badges/70/t{teams[p['team']]['code']}.png")
+        photo = _current_verified_media(session, p["code"], "photo")
+        crest = _current_verified_media(session, teams[p["team"]]["code"], "crest")
         photo.thumbnail((113, 136), Image.Resampling.LANCZOS)
         crest.thumbnail((54, 54), Image.Resampling.LANCZOS)
         canvas.paste(photo, (78 + (113-photo.width)//2, y+12 + (136-photo.height)), photo)
