@@ -21,6 +21,9 @@ import requests
 
 CANONICAL_MASTER = ("https://raw.githubusercontent.com/mukundacity-glitch/"
                     "Telegram-Bot/main/assets/references/brand_background.png")
+# Exact SHA-1 Git blob of approved 59698.png supplied by the user.
+APPROVED_MASTER_BLOB_SHA = "b0d890a529ad7416a142d3cfbbadfc800eb26bd0"
+
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
 FDR = {1: (62, 224, 147), 2: (122, 206, 172), 3: (244, 209, 112),
        4: (239, 157, 92), 5: (238, 94, 115)}
