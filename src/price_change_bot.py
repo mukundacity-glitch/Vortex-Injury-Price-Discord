@@ -535,9 +535,9 @@ def main():
         if next_event is None:
             raise RuntimeError("No verified upcoming gameweek")
         caption = (
-            f"GW{next_event}: {len(trustworthy)} verified price-watch candidates.\\n"
-            "MONITOR predicted changes; forecasts are not guaranteed.\\n"
-            "Confirm transfers and selling values before moving.\\n"
+            f"GW{next_event}: {len(trustworthy)} verified price-watch candidates.\n"
+            "MONITOR predicted changes; forecasts are not guaranteed.\n"
+            "Confirm transfers and selling values before moving.\n"
             "#FPL #FPLVortex #PriceChanges #Transfers")
         message_id, published = receipt_send(
             artwork, caption, f"price:{next_event}:{version}",
