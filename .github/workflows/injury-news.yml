@@ -62,8 +62,8 @@ jobs:
           # Mandatory original master, handles and honest-source rules are
           # opt-in until the real config is verified in staging.
           FPL_BRANDED_POSTS_ENABLED: ${{ vars.FPL_BRANDED_POSTS_ENABLED || 'false' }}
-          FPL_TELEGRAM_HANDLE: ${{ vars.FPL_TELEGRAM_HANDLE || '' }}
-          FPL_DISCORD_HANDLE: ${{ vars.FPL_DISCORD_HANDLE || '' }}
+          FPL_TELEGRAM_HANDLE: ${{ vars.FPL_TELEGRAM_HANDLE || '@FPLVortexDailyBot' }}
+          FPL_DISCORD_HANDLE: ${{ vars.FPL_DISCORD_HANDLE || '@fplvortex' }}
           FPL_BRAND_MASTER_BLOB_SHA: ${{ vars.FPL_BRAND_MASTER_BLOB_SHA || '' }}
 
           TEST_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'monitor' }}
