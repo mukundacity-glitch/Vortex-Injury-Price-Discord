@@ -156,7 +156,7 @@ def render_price_pages(rises, falls, date_text, source_label, assets=None,
         draw.line((47, 2002, 1395, 2002), fill=(67, 129, 169), width=3)
         _line(draw, f"Source: {source_label}", (59, 2020),
               width=1338, size=39, min_size=31, color=CYAN, bold=False)
-        _line(draw, "Price-progress indicator — NOT a 96% chance of a rise",
+        _line(draw, "Progress % is an indicator, not a probability of a price change",
               (59, 2070), width=1338, size=36, min_size=31,
               color=SECONDARY, bold=False)
         result.append(canvas)
