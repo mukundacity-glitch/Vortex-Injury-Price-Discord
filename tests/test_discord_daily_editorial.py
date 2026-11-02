@@ -116,5 +116,5 @@ def test_one_verified_graphic_exact_caption_and_receipt_dedup(monkeypatch, tmp_p
 
 def test_duplicate_topic_candidates_are_not_reused(monkeypatch):
     data, fixtures = fixture_data()
-    assert len(daily._ranked(data, fixtures, 10, "fixture-targets", {42})) == 0
+    assert len(daily._ranked(data, fixtures, 10, "fixture-targets", {12345})) == 0
     assert len(daily._ranked(data, fixtures, 10, "fixture-targets", set())) == 1

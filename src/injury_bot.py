@@ -2014,6 +2014,7 @@ def run_monitor():
                 f"GW{gameweek}: {len(all_changed)} confirmed FPL status changes.\n"
                 "MONITOR availability and minutes before acting.\n"
                 "Review fixtures and the next deadline before transfers.\n"
+                "HOLD transfers until the latest squad news is checked.\n"
                 "#FPL #FPLVortex #TeamNews #Availability")
             message_id, published = receipt_send(
                 artwork, description, receipt_key, DISCORD_WEBHOOK_URL,

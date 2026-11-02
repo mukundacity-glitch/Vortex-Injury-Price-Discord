@@ -22,7 +22,7 @@ import requests
 CANONICAL_MASTER = ("https://raw.githubusercontent.com/mukundacity-glitch/"
                     "Telegram-Bot/main/assets/references/brand_background.png")
 # Exact SHA-1 Git blob of the user-confirmed existing original master already in Telegram-Bot.
-APPROVED_MASTER_BLOB_SHA = "01d87ec98cf4d8d8ccff4814f4ddf5b3c339725e"
+APPROVED_MASTER_BLOB_SHA = "b0d890a529ad7416a142d3cfbbadfc800eb26bd0"
 
 POSITIONS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
 FDR = {1: (62, 224, 147), 2: (122, 206, 172), 3: (244, 209, 112),
@@ -32,10 +32,14 @@ BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"
 
 
 def font(size, bold=False):
-    try:
-        return ImageFont.truetype(BOLD if bold else FONT, size)
-    except OSError:
-        return ImageFont.load_default()
+    for path in (BOLD if bold else FONT,
+                 '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+                 if bold else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'):
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size=size)
 
 
 def verified_handles():

@@ -114,7 +114,9 @@ def _ranked(data, fixtures, gw, edition, excluded):
     teams = {t["id"]: t for t in data.get("teams", [])}
     ranked = []
     for p in data.get("elements", []):
-        if (p.get("id") in excluded or p.get("team") not in teams
+        # Telegram's last_player_ids stores stable photo/player codes, not
+        # season-local FPL element IDs. Join like-for-like across repositories.
+        if (p.get("code") in excluded or p.get("team") not in teams
                 or not p.get("code") or not teams[p["team"]].get("code")
                 or not p.get("element_type") in branded.POSITIONS
                 or p.get("now_cost") is None or p.get("minutes") is None
@@ -149,12 +151,15 @@ def _ranked(data, fixtures, gw, edition, excluded):
 def _verified_last_gw(session, player_id, gw):
     summary = _checked_get(session, SUMMARY.format(player_id))
     history = [h for h in summary.get("history", []) if h.get("round") == gw]
-    if len(history) != 1:
+    if not history:
         return None
-    h = history[0]
-    if h.get("total_points") is None or h.get("minutes") is None:
+    if any(type(h.get("total_points")) is not int or type(h.get("minutes")) is not int
+           for h in history):
         return None
-    return {"points": int(h["total_points"]), "minutes": int(h["minutes"])}
+    # A double GW has multiple fixture rows; include every actual appearance,
+    # including a verified zero-minute non-appearance in a completed match.
+    return {"points": sum(h["total_points"] for h in history),
+            "minutes": sum(h["minutes"] for h in history)}
 
 
 def _existing_edition(prefix):

@@ -561,6 +561,25 @@ def send_discord(pages, date_text):
             buffer.close()
 
 
+def create_branded_price_pages(data, rises, falls):
+    """Preserve every candidate on genuine landscape master pages, three each."""
+    try:
+        from . import branded_renderer as branded
+    except ImportError:
+        import branded_renderer as branded
+    fixtures = fetch_json("https://fantasy.premierleague.com/api/fixtures/")
+    records = []
+    for direction, candidates in (("RISE", rises), ("FALL", falls)):
+        for player in candidates:
+            records.append({"id": player["id"],
+                            "action": f"MONITOR • {direction} WATCH"})
+    pages = branded.render_batches("PRICE WATCH • TRANSFER DECISIONS", records,
+                                   data, fixtures)
+    if any(page.size != (1920, 1080) for page in pages):
+        raise RuntimeError("Branded price graphic must be 1920x1080")
+    return pages
+
+
 def main():
     data = fetch_json(FPL_API_URL)
 
@@ -590,7 +609,9 @@ def main():
     # edition, while repeated copies of the new art are still deduplicated.
     signature_payload = {
         "date": date_text,
-        "visual_version": "price-mobile-v2-two-portrait-slides",
+        "visual_version": "approved-blue-1920-v3" if os.getenv(
+            "FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true"
+            else "price-mobile-v2-two-portrait-slides",
         "rises": [(x["id"], round(x["prediction"], 4)) for x in rises],
         "falls": [(x["id"], round(x["prediction"], 4)) for x in falls],
     }
@@ -613,11 +634,13 @@ def main():
     else:
         chosen_rises, chosen_falls = rises, falls
 
-    pages = create_price_pages(chosen_rises, chosen_falls, date_text, source_label)
+    if os.getenv("FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true":
+        pages = create_branded_price_pages(data, chosen_rises, chosen_falls)
+    else:
+        pages = create_price_pages(chosen_rises, chosen_falls, date_text, source_label)
     PREVIEW_FILE.parent.mkdir(parents=True, exist_ok=True)
     for index, page in enumerate(pages):
-        suffix = "rises" if index == 0 and chosen_rises else "drops"
-        page.save(PREVIEW_FILE.with_name(f"price_change_{suffix}.png"),
+        page.save(PREVIEW_FILE.with_name(f"price_change_{index+1:02d}.png"),
                   format="PNG", optimize=True)
 
     if DRY_RUN:
@@ -637,12 +660,13 @@ def main():
         model = [(x["id"], round(x["prediction"], 4))
                  for x in chosen_rises + chosen_falls]
         version = hashlib.sha256(json.dumps(
-            {"model": sorted(model), "layout": "price-mobile-v2"}, sort_keys=True
+            {"model": sorted(model), "layout": "approved-blue-1920-v3"}, sort_keys=True
         ).encode()).hexdigest()[:24]
         caption = (
             f"GW{next_event}: verified price-change watchlist.\n"
-            "View both high-contrast pages: rises and drops.\n"
+            "Review the branded rise and fall watchlist pages.\n"
             "Progress % is an indicator, NOT a probability or confirmed change.\n"
+            "MONITOR price risk; confirm team news before any transfer.\n"
             "#FPL #FPLVortex #PriceChanges #Transfers"
         )
         message_id, published = receipt_send(
