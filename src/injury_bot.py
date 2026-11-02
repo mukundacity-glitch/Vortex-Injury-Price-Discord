@@ -1841,6 +1841,16 @@ def run_monitor():
         data
     )
 
+    # Route the requested 12:00, 14:00 and 17:00 ET Discord editions through
+    # this EXISTING 15-minute monitor. Keep its cron and original injury logic.
+    # Unverified media/fixtures/deadline must never be published; a held
+    # editorial edition must not interrupt existing verified injury alerts.
+    try:
+        from .discord_daily_editorial import run_edition
+        run_edition(data, fixtures)
+    except Exception as exc:
+        print(f"Discord editorial held ({type(exc).__name__}): {exc}")
+
     current = {}
 
     for player in data.get(
