@@ -1,4 +1,5 @@
 name: FPL Vortex Price Change Predictions
+# Recover eligible verified candidates when one official portrait is unavailable.
 
 on:
   workflow_dispatch:

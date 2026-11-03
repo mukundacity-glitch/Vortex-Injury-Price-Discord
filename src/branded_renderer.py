@@ -19,6 +19,10 @@ import re
 from PIL import Image, ImageDraw, ImageFont
 import requests
 
+
+class MissingVerifiedMedia(RuntimeError):
+    """A current official portrait/crest is unavailable, not a data failure."""
+
 CANONICAL_MASTER = ("https://raw.githubusercontent.com/mukundacity-glitch/"
                     "Telegram-Bot/main/assets/references/brand_background.png")
 # Exact SHA-1 Git blob of the user-confirmed existing original master already in Telegram-Bot.
@@ -92,6 +96,9 @@ def _current_verified_media(session, code, category):
     """Try genuine Premier League/FPL image hosts; never invent a crest/photo."""
     if not isinstance(code, int) or code <= 0:
         raise RuntimeError("No official current player/club media ID")
+    cache = getattr(session, "_vortex_verified_media", {})
+    if (category, code) in cache:
+        return cache[category, code].copy()
     if category == "photo":
         urls = [
             f"https://resources.premierleague.com/premierleague25/photos/players/250x250/{code}.png",
@@ -113,10 +120,13 @@ def _current_verified_media(session, code, category):
         try:
             image = actual_image(session, url)
             if image.width >= 48 and image.height >= 48:
+                if hasattr(session, "__dict__"):
+                    cache[category, code] = image.copy()
+                    session._vortex_verified_media = cache
                 return image
         except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
             errors.append(type(exc).__name__)
-    raise RuntimeError(f"Verified current {category} media missing; affected edition held")
+    raise MissingVerifiedMedia(f"Verified current {category} media missing; affected edition held")
 
 
 def next_five(fixtures, team_id, teams, gw):
@@ -202,7 +212,7 @@ def _one_card(base, title, rows, teams, fixtures, gw, session, handles):
 
 
 def render_batches(title, records, official_data, fixtures,
-                   *, session=None, max_cards=10):
+                   *, session=None, max_cards=10, unavailable=None):
     if not records or len(records) > max_cards*3:
         raise RuntimeError("Too many player stories for readable verified slides")
     handles = verified_handles()
@@ -235,7 +245,17 @@ def render_batches(title, records, official_data, fixtures,
                 or p.get("team") not in clubs or p.get("now_cost") is None
                 or p.get("selected_by_percent") is None or p.get("minutes") is None):
             raise RuntimeError("Player identity or mandatory real profile stat missing")
+        if unavailable is not None:
+            try:
+                _current_verified_media(client, p["code"], "photo")
+                _current_verified_media(client, clubs[p["team"]]["code"], "crest")
+            except MissingVerifiedMedia:
+                unavailable.append(p["id"])
+                print(f"Price watch: omitted official player ID {p['id']}; verified media unavailable")
+                continue
         validated.append({"player": p, "action": item.get("action") or "MONITOR"})
+    if not validated:
+        raise MissingVerifiedMedia("No price candidates have verified current portraits and crests")
     return [_one_card(base, title, validated[n:n+3], clubs, fixtures,
                       gameweek, client, handles)
             for n in range(0, len(validated), 3)]
