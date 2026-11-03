@@ -561,7 +561,7 @@ def send_discord(pages, date_text):
             buffer.close()
 
 
-def create_branded_price_pages(data, rises, falls):
+def create_branded_price_pages(data, rises, falls, *, unavailable=None):
     """Preserve every candidate on genuine landscape master pages, three each."""
     try:
         from . import branded_renderer as branded
@@ -573,8 +573,9 @@ def create_branded_price_pages(data, rises, falls):
         for player in candidates:
             records.append({"id": player["id"],
                             "action": f"MONITOR • {direction} WATCH"})
+    options = {"unavailable": unavailable} if unavailable is not None else {}
     pages = branded.render_batches("PRICE WATCH • TRANSFER DECISIONS", records,
-                                   data, fixtures)
+                                   data, fixtures, **options)
     if any(page.size != (1920, 1080) for page in pages):
         raise RuntimeError("Branded price graphic must be 1920x1080")
     return pages
@@ -634,8 +635,10 @@ def main():
     else:
         chosen_rises, chosen_falls = rises, falls
 
+    unavailable = []
     if os.getenv("FPL_BRANDED_POSTS_ENABLED", "false").lower() == "true":
-        pages = create_branded_price_pages(data, chosen_rises, chosen_falls)
+        pages = create_branded_price_pages(data, chosen_rises, chosen_falls,
+                                           unavailable=unavailable)
     else:
         pages = create_price_pages(chosen_rises, chosen_falls, date_text, source_label)
     PREVIEW_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -664,7 +667,8 @@ def main():
         ).encode()).hexdigest()[:24]
         caption = (
             f"GW{next_event}: verified price-change watchlist.\n"
-            "Review the branded rise and fall watchlist pages.\n"
+            f"Watchlist: {len(chosen_rises) + len(chosen_falls) - len(unavailable)} players; "
+            f"{len(unavailable)} omitted because verified media is unavailable.\n"
             "Progress % is an indicator, NOT a probability or confirmed change.\n"
             "MONITOR price risk; confirm team news before any transfer.\n"
             "#FPL #FPLVortex #PriceChanges #Transfers"

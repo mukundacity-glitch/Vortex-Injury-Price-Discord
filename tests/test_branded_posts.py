@@ -62,3 +62,23 @@ def test_verified_player_photo_and_club_badge_in_card(monkeypatch):
     assert len(recorded) == 2
     assert any("photos/players" in value for value in recorded)
     assert any("badges" in value for value in recorded)
+
+
+def test_price_watch_missing_portrait_does_not_block_other_verified_players(monkeypatch):
+    data, fixtures = sample()
+    data["elements"].append(dict(data["elements"][0], id=100, code=5678))
+    monkeypatch.setenv("FPL_TELEGRAM_HANDLE", "@verifiedTelegram")
+    monkeypatch.setenv("FPL_DISCORD_HANDLE", "@verifiedDiscord")
+    monkeypatch.setattr(branded, "master_slide", lambda session: Image.new("RGB", (1536, 864)))
+    def media(session, code, category):
+        if code == 1234:
+            raise branded.MissingVerifiedMedia("missing official photo")
+        return Image.new("RGBA", (100, 200))
+    monkeypatch.setattr(branded, "_current_verified_media", media)
+    omitted = []
+    pages = branded.render_batches("Price watch", [{"id": 99}, {"id": 100}],
+                                   data, fixtures, session=object(), unavailable=omitted)
+    assert omitted == [99]
+    assert len(pages) == 1 and pages[0].size == (1920, 1080)
+    with pytest.raises(branded.MissingVerifiedMedia):
+        branded.render_batches("Injury news", [{"id": 99}], data, fixtures, session=object())
