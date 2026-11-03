@@ -160,45 +160,44 @@ def _label(draw, text, x, y, size, width, color=(235, 246, 255)):
 
 
 def _one_card(base, title, rows, teams, fixtures, gw, session, handles):
-    canvas = base.copy()
-    draw = ImageDraw.Draw(canvas, "RGBA")
-    draw.rounded_rectangle((36, 96, 1500, 733), radius=17,
-                           fill=(2, 17, 41, 239), outline=(49, 213, 252, 224), width=3)
-    _label(draw, title.upper(), 69, 111, 42, 1110)
-    _label(draw, f"GW{gw}", 1347, 119, 30, 120, (247, 207, 101))
-    for index, data in enumerate(rows):
-        p = data["player"]
-        y = 184 + index*176
-        draw.rounded_rectangle((56, y, 1476, y+164), radius=10,
-                               fill=(4, 29, 63, 242), outline=(51, 117, 178, 185), width=2)
-        photo = _current_verified_media(session, p["code"], "photo")
-        crest = _current_verified_media(session, teams[p["team"]]["code"], "crest")
-        photo.thumbnail((113, 136), Image.Resampling.LANCZOS)
-        crest.thumbnail((54, 54), Image.Resampling.LANCZOS)
-        canvas.paste(photo, (78 + (113-photo.width)//2, y+12 + (136-photo.height)), photo)
-        canvas.paste(crest, (202, y+10), crest)
-        draw = ImageDraw.Draw(canvas, "RGBA")
-        _label(draw, p.get("web_name") or p["second_name"], 270, y+14, 26, 290)
-        _label(draw, f"{POSITIONS[p['element_type']]} • £{p['now_cost']/10:.1f}m",
-               270, y+47, 19, 310, (237, 197, 102))
-        _label(draw, f"Own {p['selected_by_percent']}% • Mins {p['minutes']}",
-               270, y+75, 18, 300, (224, 235, 249))
-        reason = data.get("action") or "MONITOR"
-        _label(draw, reason, 275, y+114, 24, 280, (73, 227, 152))
-        five = next_five(fixtures, p["team"], teams, gw)
-        for j, (event, games) in enumerate(five):
-            x = 602 + j*171
-            draw.rounded_rectangle((x, y+15, x+158, y+146), radius=8,
-                                   fill=(1, 21, 49, 247), outline=(60, 152, 217, 180), width=1)
-            _label(draw, f"GW{event}", x+8, y+23, 19, 142)
+    try:
+        from .comparison_board import comparison_board
+    except ImportError:  # existing production entrypoint: python src/price_change_bot.py
+        from comparison_board import comparison_board
+    profiles = []
+    fields = {"TOTAL PTS": "total_points", "MINUTES": "minutes",
+              "CS": "clean_sheets", "GOALS": "goals_scored", "ASSISTS": "assists",
+              "xG": "expected_goals", "xA": "expected_assists", "xGI": "expected_goal_involvements",
+              "DC ACTIONS": "defensive_contribution", "SAVES": "saves", "xGC": "expected_goals_conceded"}
+    for data in rows:
+        player = data["player"]
+        club = teams[player["team"]]
+        if player.get("form") is None:
+            raise RuntimeError("Verified official player form is missing")
+        metrics = {"PRICE": f"£{player['now_cost']/10:.1f}m",
+                   "OWNERSHIP": f"{float(player['selected_by_percent']):.1f}%",
+                   "FORM": str(player["form"])}
+        for label, field in fields.items():
+            if player.get(field) is not None:
+                metrics[label] = str(player[field])
+        future = []
+        for event, games in next_five(fixtures, player["team"], teams, gw):
             if not games:
-                _label(draw, "BLANK", x+8, y+70, 21, 140, (230, 236, 242))
-            for n, (opp, ha, difficulty, fid) in enumerate(games[:2]):
-                fy = y+52+n*42
-                _label(draw, f"{opp} ({ha})  FDR {difficulty}", x+8, fy,
-                       18, 141, FDR[difficulty])
-                # xPts are deliberately omitted until an authenticated,
-                # fixture-ID-matched and fresh independent model is connected.
+                future.append({"gw": event, "blank": True})
+            for opponent, venue, difficulty, fixture_id in games:
+                future.append({"gw": event, "blank": False, "opponent": opponent,
+                               "venue": venue, "fdr": difficulty, "fixture_id": fixture_id})
+        action = data.get("action") or "MONITOR"
+        profiles.append({"name": player.get("web_name") or player["second_name"],
+                         "club": club.get("name") or club["short_name"],
+                         "position": POSITIONS[player["element_type"]],
+                         "metrics": metrics, "fixtures": future,
+                         "portrait": _current_verified_media(session, player["code"], "photo"),
+                         "badge": _current_verified_media(session, club["code"], "crest"),
+                         "action": action.split("•")[0].strip(),
+                         "reason": player.get("news") or action,
+                         "label": action})
+    canvas = comparison_board(base, title, gw, profiles)
     # Cover the original informational footer only where new handles belong;
     # original lion, left social icons and header remain original pixels.
     draw = ImageDraw.Draw(canvas, "RGBA")

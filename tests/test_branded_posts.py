@@ -82,3 +82,17 @@ def test_price_watch_missing_portrait_does_not_block_other_verified_players(monk
     assert len(pages) == 1 and pages[0].size == (1920, 1080)
     with pytest.raises(branded.MissingVerifiedMedia):
         branded.render_batches("Injury news", [{"id": 99}], data, fixtures, session=object())
+
+
+def test_direct_script_entrypoint_loads_shared_comparison_layout(monkeypatch):
+    import importlib
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / 'src'))
+    direct = importlib.import_module('branded_renderer')
+    data, fixtures = sample()
+    monkeypatch.setenv('FPL_TELEGRAM_HANDLE', '@verifiedTelegram')
+    monkeypatch.setenv('FPL_DISCORD_HANDLE', '@verifiedDiscord')
+    monkeypatch.setattr(direct, 'master_slide', lambda session: Image.new('RGB', (1536, 864)))
+    monkeypatch.setattr(direct, '_current_verified_media',
+                        lambda *args: Image.new('RGBA', (100, 160), (70, 120, 210)))
+    pages = direct.render_batches('Price watch', [{'id': 99}], data, fixtures, session=object())
+    assert pages[0].size == (1920, 1080)
