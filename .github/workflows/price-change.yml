@@ -16,10 +16,8 @@ on:
   push:
     branches: [main]
     paths: ['.github/workflows/price-change.yml']
-  schedule:
-    # Final daily snapshot before the 00:00 UK price-change window.
-    - cron: "45 23 * * *"
-      timezone: "Europe/London"
+  # Scheduled delivery is owned by Telegram-Bot's shared ChatGPT outbox.
+  # Manual diagnostics remain available; no second automatic publisher.
 
 permissions:
   contents: read
@@ -64,6 +62,7 @@ jobs:
 
       - name: Run FPL Vortex Price Change Engine
         env:
+          FPL_PUBLISH_WINDOW_ENFORCED: 'true'
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           # Mandatory original master, handles and honest-source rules are
           # opt-in until the real config is verified in staging.

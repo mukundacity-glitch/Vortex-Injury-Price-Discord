@@ -126,6 +126,15 @@ def _current_verified_media(session, code, category):
                 return image
         except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
             errors.append(type(exc).__name__)
+    if category == 'photo':
+        try:
+            from .ai_portraits import load_portrait, record_missing
+        except ImportError:
+            from ai_portraits import load_portrait, record_missing
+        fallback = load_portrait(code)
+        if fallback is not None:
+            return fallback
+        record_missing(code)
     raise MissingVerifiedMedia(f"Verified current {category} media missing; affected edition held")
 
 
@@ -263,6 +272,11 @@ def render_batches(title, records, official_data, fixtures,
 def receipt_send(images, caption, identity, webhook_url, journal_path, *,
                  session=None):
     """Send all pages as one Discord message, receipt-check and dedup."""
+    try:
+        from .publishing_window import assert_allowed
+    except ImportError:
+        from publishing_window import assert_allowed
+    assert_allowed()
     if not images or len(images) > 10 or len(caption) > 2000:
         raise RuntimeError("Message violates Discord media/caption limits")
     if not webhook_url or not webhook_url.startswith("https://discord.com/api/webhooks/"):

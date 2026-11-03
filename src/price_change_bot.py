@@ -582,6 +582,11 @@ def create_branded_price_pages(data, rises, falls, *, unavailable=None):
 
 
 def main():
+    try:
+        from .publishing_window import assert_allowed
+    except ImportError:
+        from publishing_window import assert_allowed
+    assert_allowed()
     data = fetch_json(FPL_API_URL)
 
     try:
