@@ -194,9 +194,20 @@ def comparison_board(master, title, gw, players, *, verdict=""):
     summary = verdict if verdict.strip().upper() not in generic else ""
     summary = summary or "  |  ".join(f"{p['name']}: {p['action']}" for p in players)
     text(draw, summary, 280, 692, 1208, 21, WHITE, 16)
-    draw.rounded_rectangle((71, 737, 1465, 795), radius=11,
-                           fill=NAVY, outline=CYAN, width=2)
-    text(draw, "FPL VORTEX • DECISION", 90, 746, 365, 23, GOLD)
-    text(draw, "VERIFY MINUTES • FIXTURES • PLAYER FORM BEFORE TRANSFERS",
-         475, 747, 968, 25, WHITE, 18)
+    # Five consecutive GW slots per player; doubles stay in the same cell.
+    band_width = 1436 / len(players)
+    colors = {1: '#00be86', 2: '#6bcf9c', 3: '#ffd477', 4: '#f3a36d', 5: '#ef6975'}
+    for i, player in enumerate(players):
+        left = 50 + i*band_width
+        cell_width = (band_width-14)/5
+        for offset in range(5):
+            week = gw+offset
+            rows = [r for r in player['fixtures'] if r.get('gw') == week]
+            fixture = ' / '.join(f"{r['opponent']}({r['venue']})" for r in rows if not r.get('blank')) or 'BLANK'
+            fdrs = [r['fdr'] for r in rows if r.get('fdr') in colors]
+            color = colors[max(fdrs)] if fdrs else '#718096'
+            x = left+offset*cell_width
+            draw.rounded_rectangle((x, 738, x+cell_width-4, 795), radius=5, fill=NAVY, outline=color, width=2)
+            text(draw, f'GW{week}', x+5, 740, cell_width-12, 16, WHITE, 13, center=True)
+            text(draw, fixture, x+5, 761, cell_width-12, 21, WHITE, 14, center=True)
     return canvas

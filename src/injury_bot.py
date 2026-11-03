@@ -2093,6 +2093,11 @@ def load_state():
 
 
 def main():
+    try:
+        from .publishing_window import assert_allowed
+    except ImportError:
+        from publishing_window import assert_allowed
+    assert_allowed()
     if RUN_MODE == "preview":
         run_preview()
         return

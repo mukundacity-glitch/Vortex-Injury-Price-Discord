@@ -15,8 +15,8 @@ on:
   push:
     branches: [main]
     paths: ['.github/workflows/injury-news.yml']
-  schedule:
-    - cron: "7,22,37,52 * * * *"
+  # Scheduled delivery is owned by Telegram-Bot's shared ChatGPT outbox.
+  # Manual diagnostics remain available; no second automatic publisher.
 
 permissions:
   contents: read
@@ -60,6 +60,7 @@ jobs:
 
       - name: Run FPL Vortex Injury Engine
         env:
+          FPL_PUBLISH_WINDOW_ENFORCED: 'true'
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           # Mandatory original master, handles and honest-source rules are
           # opt-in until the real config is verified in staging.
