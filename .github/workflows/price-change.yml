@@ -16,8 +16,12 @@ on:
   push:
     branches: [main]
     paths: ['.github/workflows/price-change.yml']
-  # Scheduled delivery is owned by Telegram-Bot's shared ChatGPT outbox.
-  # Manual diagnostics remain available; no second automatic publisher.
+  # Restore this repository's existing original Discord price-watch lane.
+  # UK pre-price-change checkpoint falls inside 05:00–20:00 ET; receipt
+  # deduplication prevents the same verified forecast from reposting.
+  schedule:
+    - cron: '45 23 * * *'
+      timezone: Europe/London
 
 permissions:
   contents: read
@@ -59,6 +63,15 @@ jobs:
 
       - name: Validate original-branded graphics and dedup offline
         run: python -m pytest -q tests
+
+      - name: Require the existing Discord webhook secret
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo '::error::DISCORD_WEBHOOK_URL is missing in this repository'
+            exit 1
+          fi
 
       - name: Run FPL Vortex Price Change Engine
         env:
