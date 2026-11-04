@@ -1,7 +1,11 @@
 name: Discord Webhook Test
 
 on:
-  # The existing test workflow also runs safe no-webhook PR validation.
+  # Offline-only validation runs for code and delivery-workflow repairs.
+  # The live webhook test remains manual-only.
+  push:
+    branches: [main]
+    paths: ['.github/workflows/**', 'src/**', 'tests/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -11,7 +15,7 @@ permissions:
 
 jobs:
   validate-code:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout proposed Discord implementation
