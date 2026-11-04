@@ -298,11 +298,26 @@ def receipt_send(images, caption, identity, webhook_url, journal_path, *,
             buffers.append(out)
             files.append((f"files[{idx}]", (f"fpl_vortex_{idx+1}.png", out, "image/png")))
         client = session or requests.Session()
-        response = client.post(webhook_url, params={"wait": "true"}, timeout=50,
-                               data={"payload_json": json.dumps({
-                                   "username": "FPL VORTEX", "content": caption,
-                                   "allowed_mentions": {"parse": []}})},
-                               files=files)
+        payload = {"payload_json": json.dumps({
+            "username": "FPL VORTEX", "content": caption,
+            "allowed_mentions": {"parse": []}})}
+        # HTTP 429 is a confirmed rate-limit rejection, so bounded retry
+        # is safe. Never blindly retry unknown network/5xx acceptance.
+        from time import sleep
+        for attempt in range(3):
+            for stream in buffers:
+                stream.seek(0)
+            response = client.post(webhook_url, params={"wait": "true"}, timeout=50,
+                                   data=payload, files=files)
+            if getattr(response, "status_code", 200) != 429:
+                break
+            if attempt == 2:
+                raise RuntimeError("Discord rate limit persisted; no post confirmed")
+            try:
+                retry_after = float(response.headers.get("Retry-After", "1"))
+            except (ValueError, TypeError, AttributeError):
+                retry_after = 1.0
+            sleep(max(0.5, min(retry_after, 5.0)))
         response.raise_for_status()
         message_id = response.json().get("id")
         if not message_id:
