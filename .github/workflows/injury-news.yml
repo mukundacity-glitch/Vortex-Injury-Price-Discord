@@ -15,8 +15,12 @@ on:
   push:
     branches: [main]
     paths: ['.github/workflows/injury-news.yml']
-  # Scheduled delivery is owned by Telegram-Bot's shared ChatGPT outbox.
-  # Manual diagnostics remain available; no second automatic publisher.
+  # Restore this repository's original Discord injury monitoring lane.
+  # Publish only inside the approved Eastern-time window; existing receipt
+  # deduplication prevents repeating unchanged verified updates.
+  schedule:
+    - cron: '7,22,37,52 5-19 * * *'
+      timezone: America/New_York
 
 permissions:
   contents: read
@@ -57,6 +61,15 @@ jobs:
 
       - name: Validate original-branded graphics and dedup offline
         run: python -m pytest -q tests
+
+      - name: Require the existing Discord webhook secret
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo '::error::DISCORD_WEBHOOK_URL is missing in this repository'
+            exit 1
+          fi
 
       - name: Run FPL Vortex Injury Engine
         env:
