@@ -41,3 +41,41 @@ def test_corrupt_or_unknown_receipt_holds_instead_of_reposting(tmp_path):
     url = "https://" + "discord.com" + "/api/" + "webhooks/0/example"
     with pytest.raises(RuntimeError, match="safely read"):
         branded.receipt_send([img], "Caption", "topic", url, path, session=object())
+
+
+def test_discord_rate_limit_retries_safely_with_fresh_attachment_bytes(monkeypatch, tmp_path):
+    delays = []
+    monkeypatch.setattr("time.sleep", delays.append)
+
+    class Response:
+        def __init__(self, code):
+            self.status_code = code
+            self.headers = {"Retry-After": "0.5"}
+        def raise_for_status(self):
+            assert self.status_code == 200
+        def json(self):
+            return {"id": "confirmed-429-recovery"}
+
+    class Session:
+        def __init__(self):
+            self.attempts = 0
+            self.payload_sizes = []
+        def post(self, *args, **kwargs):
+            self.attempts += 1
+            self.payload_sizes.append(sum(len(info[1].read())
+                                          for _, info in kwargs["files"]))
+            return Response(429 if self.attempts == 1 else 200)
+
+    client = Session()
+    image = Image.new("RGB", (1920, 1080), (4, 21, 54))
+    webhook = "https://" + "discord.com" + "/api/" + "webhooks/0/example"
+    ledger = tmp_path / "receipts.json"
+    result = branded.receipt_send([image], "Verified news", "unique-story",
+                                  webhook, ledger, session=client)
+    assert result == ("confirmed-429-recovery", True)
+    assert client.attempts == 2
+    assert all(size > 0 for size in client.payload_sizes)
+    assert delays == [0.5]
+    assert branded.receipt_send([image], "Verified news", "unique-story",
+                                webhook, ledger, session=client)[1] is False
+    assert client.attempts == 2
