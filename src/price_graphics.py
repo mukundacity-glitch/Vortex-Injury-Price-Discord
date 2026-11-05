@@ -9,20 +9,24 @@ It does not affect the injury/news renderer, shared master, or other posts.
 from __future__ import annotations
 
 from PIL import Image, ImageDraw, ImageFont
+try:
+    from .minimal_theme import background_color
+except ImportError:
+    from minimal_theme import background_color
 
 WIDTH, HEIGHT = 1440, 2160
 PAGE_SIZE = (WIDTH, HEIGHT)
 ROW_LIMIT = 10
 ROW_START, ROW_STEP, ROW_HEIGHT = 292, 169, 154
-NAVY = (5, 19, 41)
-PANEL = (13, 35, 66)
-PANEL_EDGE = (51, 87, 126)
-WHITE = (248, 251, 255)
-SECONDARY = (219, 233, 246)
-CYAN = (92, 221, 245)
-GOLD = (255, 212, 123)
-GREEN = (68, 234, 163)
-RED = (255, 135, 148)
+NAVY = (252, 251, 247)
+PANEL = (255, 255, 255)
+PANEL_EDGE = (216, 212, 199)
+WHITE = (12, 16, 20)
+SECONDARY = (49, 54, 59)
+CYAN = (12, 16, 20)
+GOLD = (12, 16, 20)
+GREEN = (20, 110, 56)
+RED = (167, 43, 98)
 FONT_BOLD = ("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf",
              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 FONT_NORMAL = ("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
@@ -84,7 +88,7 @@ def row_rect(index):
 def _draw_player(canvas, draw, item, index, direction, assets):
     x1, y1, x2, y2 = row_rect(index)
     accent = GREEN if direction == "rise" else RED
-    shade = (15, 75, 62) if direction == "rise" else (84, 33, 53)
+    shade = (196, 240, 208) if direction == "rise" else (250, 211, 231)
     draw.rounded_rectangle((x1, y1, x2, y2), radius=17,
                            fill=PANEL, outline=PANEL_EDGE, width=3)
     draw.rounded_rectangle((x1, y1 + 9, x1 + 11, y2 - 9),
@@ -99,7 +103,7 @@ def _draw_player(canvas, draw, item, index, direction, assets):
     # Keep actual team / price facts visible even on a narrow phone.
     club_price = f"{item.get('team') or 'Team N/A'}  •  {item.get('price_label', '£N/A')}"
     _line(draw, club_price, (281, y1 + 93), width=667,
-          size=43, min_size=35, color=SECONDARY, bold=False)
+          size=43, min_size=35, color=SECONDARY, bold=True)
 
     progress = item.get("prediction")
     if not isinstance(progress, (int, float)):
@@ -135,29 +139,29 @@ def render_price_pages(rises, falls, date_text, source_label, assets=None,
     for direction, entries in (("rise", rises), ("drop", falls)):
         if not entries:
             continue
-        canvas = Image.new("RGB", PAGE_SIZE, NAVY)
+        canvas = Image.new("RGB", PAGE_SIZE, background_color(f"{date_text}|{direction}"))
         draw = ImageDraw.Draw(canvas)
         _image_within(canvas, logo, (42, 27, 192, 160))
         _line(draw, "PRICE CHANGE PREDICTIONS", (216, 41),
               width=1172, size=74, min_size=58, color=WHITE)
         _line(draw, date_text, (219, 129), width=1100, size=44,
-              min_size=36, color=SECONDARY, bold=False)
+              min_size=36, color=SECONDARY, bold=True)
         title = "▲  TOP 10 PRICE RISE TARGETS" if direction == "rise" \
             else "▼  TOP 10 PRICE DROP TARGETS"
         accent = GREEN if direction == "rise" else RED
         draw.rounded_rectangle((43, 199, 1398, 280), radius=15,
-                               fill=(14, 48, 74), outline=accent, width=3)
-        _line(draw, title, (71, 211), width=1277, size=53, min_size=41,
-              color=accent)
+                               fill=PANEL, outline=accent, width=3)
+        _line(draw, title, (71, 211), width=1277, size=55, min_size=41,
+              color=WHITE)
         for i, item in enumerate(entries):
             _draw_player(canvas, draw, item, i, direction, assets)
 
         # No tiny three-line source in the margin, and no fabricated probability.
         draw.line((47, 2002, 1395, 2002), fill=(67, 129, 169), width=3)
         _line(draw, f"Source: {source_label}", (59, 2020),
-              width=1338, size=39, min_size=31, color=CYAN, bold=False)
+              width=1338, size=39, min_size=31, color=CYAN, bold=True)
         _line(draw, "Progress % is an indicator, not a probability of a price change",
               (59, 2070), width=1338, size=36, min_size=31,
-              color=SECONDARY, bold=False)
+              color=SECONDARY, bold=True)
         result.append(canvas)
     return result
