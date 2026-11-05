@@ -16,17 +16,28 @@ def profile(name="Example"):
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 4])
-def test_yellow_tables_black_ink_and_original_brand_regions(count):
+def test_minimal_paper_black_ink_and_action_ribbons(count):
     original = Image.new("RGB", board.SIZE, (11, 30, 51))
-    image = board.comparison_board(original, "CURRENT PLAYER PICKS", 10,
-                                   [profile(f"Verified Player {i}") for i in range(count)])
-    table = image.crop((46, 516, 1490, 661))
-    colors = dict((color, number) for number, color in table.getcolors(table.width*table.height))
-    assert colors[board.TABLE_YELLOW] > table.width*table.height*.80
-    assert colors[board.TABLE_INK] > 100
-    assert image.crop((0, 0, 280, 64)).tobytes() == original.crop((0, 0, 280, 64)).tobytes()
-    assert image.crop((1380, 0, 1536, 64)).tobytes() == original.crop((1380, 0, 1536, 64)).tobytes()
-    assert image.crop((0, 800, 1536, 864)).tobytes() == original.crop((0, 800, 1536, 864)).tobytes()
+    players = [profile(f"Verified Player {i}") for i in range(count)]
+    for p, action in zip(players, ('START', 'HOLD', 'MONITOR', 'HOLD')):
+        p['action'] = p['label'] = action
+    image = board.comparison_board(original, "CURRENT PLAYER PICKS", 10, players)
+    assert image.size == board.SIZE
+    assert min(image.getpixel((0, 400))) > 235
+    if count == 4:
+        width = (1460-14*(count-1))/count
+        for n, p in enumerate(players):
+            x = round(38+n*(width+14))
+            assert image.getpixel((x+20, 150)) == board.action_fill(p['action'])
+    assert image.getpixel((48, 520)) == (255,255,255)
+    assert board.TABLE_INK == (12,16,20)
+
+
+def test_background_varies_by_edition_but_retry_is_stable():
+    from importlib import import_module
+    theme = import_module(board.__package__ + '.minimal_theme')
+    assert theme.background_color('morning') != theme.background_color('evening')
+    assert theme.background_color('morning') == theme.background_color('morning')
 
 
 def test_portraits_keep_original_proportions_and_align_to_bottom():

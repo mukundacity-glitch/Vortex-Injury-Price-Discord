@@ -207,15 +207,11 @@ def _one_card(base, title, rows, teams, fixtures, gw, session, handles):
                          "reason": player.get("news") or action,
                          "label": action})
     canvas = comparison_board(base, title, gw, profiles)
-    # Cover the original informational footer only where new handles belong;
-    # original lion, left social icons and header remain original pixels.
-    draw = ImageDraw.Draw(canvas, "RGBA")
-    draw.rounded_rectangle((644, 803, 1519, 854), radius=5,
-                           fill=(3, 14, 35, 245), outline=(48, 188, 241, 175), width=1)
-    _label(draw, f"TELEGRAM  t.me/{handles[0].lstrip('@')}", 658, 816, 22, 416,
-           (47, 218, 246))
-    _label(draw, f"DISCORD  {handles[1]}", 1100, 816, 22, 395,
-           (169, 172, 253))
+    try:
+        from .minimal_theme import social_footer
+    except ImportError:
+        from minimal_theme import social_footer
+    social_footer(canvas, *handles)
     return canvas.resize((1920, 1080), Image.Resampling.LANCZOS)
 
 

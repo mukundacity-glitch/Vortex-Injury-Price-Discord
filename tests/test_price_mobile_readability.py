@@ -42,11 +42,12 @@ def test_root_cause_remedied_two_portrait_images_keep_all_top_20():
     assert pg.row_rect(0)[1] == pg.ROW_START
     assert pg.row_rect(9)[3] < 2002  # space for an uncut source footer
     assert pg.ROW_HEIGHT > 140
-    assert pages[0].getpixel((0, 0)) == pg.NAVY
+    assert min(pages[0].getpixel((0, 0))) > 235
+    assert pages[0].getpixel((0, 0)) != pages[1].getpixel((0, 0))
     assert pages[0].getpixel((100, pg.ROW_START+30)) == pg.PANEL
-    # Panel text and numbers are contrasted, not dark text on pale cream.
-    assert pg.WHITE[0] > 230
-    assert pg.PANEL[0] < 30 and pg.NAVY[0] < 20
+    # Minimal white panels use high-contrast black text and numbers.
+    assert max(pg.WHITE) < 30
+    assert min(pg.PANEL) > 235 and min(pg.NAVY) > 235
 
 
 def test_displays_one_photo_and_one_crest_without_distorting_aspect_ratio(monkeypatch):

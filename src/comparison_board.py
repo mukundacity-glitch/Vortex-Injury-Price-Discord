@@ -6,16 +6,20 @@ ranking, fetches data or sends a post. Keep the Discord copy byte-identical.
 from __future__ import annotations
 
 from PIL import Image, ImageDraw, ImageFont
+try:
+    from .minimal_theme import background, action_fill, social_footer
+except ImportError:
+    from minimal_theme import background, action_fill, social_footer
 
-STYLE_VERSION = "reference-2-yellow-tables-v1"
+STYLE_VERSION = "minimal-paper-action-fills-v2"
 SIZE = (1536, 864)
-TABLE_YELLOW = (255, 239, 168)
+TABLE_YELLOW = (255, 255, 255)
 TABLE_INK = (12, 16, 20)
-TABLE_RULE = (180, 151, 66)
-GOLD = (247, 205, 84)
-CYAN = (57, 222, 248)
-WHITE = (248, 251, 255)
-NAVY = (2, 20, 43, 248)
+TABLE_RULE = (216, 212, 199)
+GOLD = (176, 139, 42)
+CYAN = (30, 150, 157)
+WHITE = (12, 16, 20)
+NAVY = (255, 255, 255, 255)
 
 
 def font(size, bold=True):
@@ -30,6 +34,7 @@ def font(size, bold=True):
 
 
 def text(draw, value, x, y, width, size=23, color=WHITE, minimum=15, center=False):
+    color = TABLE_INK
     value = " ".join(str(value).split())
     while size > minimum and draw.textbbox((0, 0), value, font=font(size))[2] > width:
         size -= 1
@@ -75,20 +80,17 @@ def contain(canvas, source, box, *, bottom=False, crop_alpha=False):
 
 def panel(draw, box, accent=GOLD):
     x0, y0, x1, y1 = box
-    points = [(x0+18, y0), (x1-18, y0), (x1, y0+18), (x1, y1-18),
-              (x1-18, y1), (x0+18, y1), (x0, y1-18), (x0, y0+18)]
-    draw.polygon(points, fill=NAVY)
-    draw.line(points+[points[0]], fill=accent, width=3)
+    draw.rounded_rectangle(box, radius=20, fill=NAVY, outline=TABLE_RULE, width=2)
 
 
 def compact_table(draw, rows, box):
-    """Every cell, including labels, has yellow fill and black text."""
+    """White cells, fine rules and bold black text."""
     x0, y0, x1, y1 = box
     draw.rounded_rectangle(box, radius=7, fill=TABLE_YELLOW, outline=TABLE_RULE, width=2)
     height = (y1-y0)/len(rows)
     width = x1-x0
     label_width = width*.53
-    size = 19 if width >= 230 else 16
+    size = 21 if width >= 230 else 18
     for n, (label, value) in enumerate(rows):
         top = y0+n*height
         if n:
@@ -150,10 +152,11 @@ def comparison_board(master, title, gw, players, *, verdict=""):
     """Draw reference-2 geometry for one to four fact-checked player profiles."""
     if not 1 <= len(players) <= 4:
         raise ValueError("Comparison board supports one to four players per slide")
-    canvas = master.convert("RGB").resize(SIZE, Image.Resampling.LANCZOS)
+    key = f'{title}|{gw}|' + '|'.join(p['name'] + str(p['metrics']) for p in players)
+    canvas = background(master, key, SIZE)
     draw = ImageDraw.Draw(canvas, "RGBA")
-    # Preserve actual masthead logos and the original entire footer artwork.
-    text(draw, title.upper(), 302, 4, 1035, 38, WHITE, 23, center=True)
+    # The minimal background retains supplied masthead brand marks.
+    text(draw, title.upper(), 302, 4, 1035, 40, WHITE, 23, center=True)
     text(draw, "FORM • MINUTES • FIXTURE • VALUE", 385, 47, 900, 18, CYAN, center=True)
     draw.polygon([(680, 78), (856, 78), (846, 115), (670, 115)], fill=GOLD, outline=(255, 240, 180))
     text(draw, f"GW{gw}", 686, 78, 148, 30, TABLE_INK, center=True)
@@ -162,8 +165,25 @@ def comparison_board(master, title, gw, players, *, verdict=""):
     for n, player in enumerate(players):
         x0 = round(38+n*(width+gap))
         x1 = round(x0+width)
-        accent = CYAN if n % 2 else GOLD
+        accent = GOLD if player.get('label') == 'VORTEX CAPTAIN' else CYAN if len(players) == 3 else CYAN if n % 2 else GOLD
         panel(draw, (x0, 124, x1, 496), accent)
+        if len(players) == 4:
+            # Four equal columns: no portrait/table squeeze or clipped names.
+            draw.rounded_rectangle((x0+12, 132, x1-12, 161), radius=4, fill=action_fill(player['action']))
+            text(draw, player.get('label') or player['action'], x0+18, 134,
+                 width-36, 25, TABLE_INK, 18, center=True)
+            text(draw, player['name'].upper(), x0+16, 168, width-32, 32, WHITE, 23, center=True)
+            text(draw, f"{player['club']} • {player['position']}", x0+14, 203,
+                 width-28, 17, WHITE, 15, center=True)
+            contain(canvas, player['portrait'], (x0+52, 222, width-104, 124), bottom=True, crop_alpha=True)
+            contain(canvas, player['badge'], (x1-69, 232, 48, 48))
+            draw = ImageDraw.Draw(canvas, 'RGBA')
+            metrics = player['metrics']
+            opponent, difficulty = current_fixture(player['fixtures'], gw)
+            compact_table(draw, player.get('summary_rows') or [('PRICE', metrics['PRICE']), ('OWNERSHIP', metrics['OWNERSHIP']),
+                                ('FORM', metrics['FORM']), ('FIXTURE', opponent), ('FDR', difficulty)],
+                          (x0+12, 352, x1-12, 487))
+            continue
         photo_width = min(400, round(width*.40))
         detail_x = x0+photo_width+16
         detail_w = x1-detail_x-13
@@ -171,7 +191,7 @@ def comparison_board(master, title, gw, players, *, verdict=""):
         contain(canvas, player["badge"], (x1-73, 174, 58, 61))
         draw = ImageDraw.Draw(canvas, "RGBA")
         ribbon_x = max(x0+18, detail_x-18)
-        draw.polygon([(ribbon_x+9, 133), (x1-18, 133), (x1-27, 166), (ribbon_x, 166)], fill=GOLD)
+        draw.polygon([(ribbon_x+9, 133), (x1-18, 133), (x1-27, 166), (ribbon_x, 166)], fill=action_fill(player['action']))
         label = player.get("label") or player["action"]
         text(draw, label.upper(), ribbon_x+12, 138, x1-ribbon_x-43, 21, TABLE_INK, 14, center=True)
         text(draw, player["name"].upper(), detail_x, 179, detail_w-65, 34, WHITE, 18)
@@ -209,5 +229,11 @@ def comparison_board(master, title, gw, players, *, verdict=""):
             x = left+offset*cell_width
             draw.rounded_rectangle((x, 738, x+cell_width-4, 795), radius=5, fill=NAVY, outline=color, width=2)
             text(draw, f'GW{week}', x+5, 740, cell_width-12, 16, WHITE, 13, center=True)
-            text(draw, fixture, x+5, 761, cell_width-12, 21, WHITE, 14, center=True)
+            if len(players) == 4:
+                teams = '/'.join(r['opponent'] for r in rows if not r.get('blank')) or 'BLANK'
+                venues = '/'.join(r['venue'] for r in rows if not r.get('blank'))
+                text(draw, teams, x+4, 758, cell_width-10, 18, WHITE, 10, center=True)
+                text(draw, venues, x+4, 780, cell_width-10, 12, WHITE, 10, center=True)
+            else:
+                text(draw, fixture, x+5, 761, cell_width-12, 21, WHITE, 14, center=True)
     return canvas
