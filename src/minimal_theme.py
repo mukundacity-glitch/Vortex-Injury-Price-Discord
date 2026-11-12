@@ -36,6 +36,12 @@ def background_color(key):
     return (9 + digest[0] % 8, 9 + digest[1] % 7, 39 + digest[2] % 19)
 
 
+def edition_key(item):
+    """Keep existing stable edition identity and retry artwork consistent."""
+    return '|'.join(str(getattr(item, field, '')) for field in ('kind', 'title', 'gw', 'data_at', 'source_time'))
+
+
+
 def background(master, key, size=(1536, 864)):
     """Gradient, neon trim and existing real master logos; no white canvas."""
     w, h = size
