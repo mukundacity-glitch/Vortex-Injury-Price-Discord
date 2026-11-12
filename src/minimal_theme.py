@@ -34,6 +34,10 @@ def action_fill(action):
     return GOLD
 
 
+def edition_key(item):
+    return '|'.join(str(getattr(item, field, '')) for field in ('kind', 'title', 'gw', 'data_at', 'source_time'))
+
+
 def background_color(key):
     """Deterministic dark navy/purple; a retry renders the same pixels."""
     seed = hashlib.sha256(str(key).encode('utf-8')).digest()
