@@ -99,8 +99,12 @@ def background(master, key, size=(1536, 864)):
     branded = _brand_logo(canvas)
     title = 'FPL VORTEX'
     d = ImageDraw.Draw(canvas)
+    brand_x = round(w * (.092 if branded else .033))
+    max_brand_width = round(w * .196) - brand_x
     brand_size = round(w * .028)
-    d.text((round(w*(.092 if branded else .033)), round(h*.031)), title,
+    while brand_size > 14 and d.textbbox((0, 0), title, font=face(brand_size))[2] > max_brand_width:
+        brand_size -= 1
+    d.text((brand_x, round(h*.031)), title,
            font=face(brand_size), fill=CYAN, stroke_width=1,
            stroke_fill=(28, 7, 72))
     return canvas
