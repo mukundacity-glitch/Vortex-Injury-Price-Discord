@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 import hashlib
+import fcntl
 import json
 import os
 import re
@@ -265,9 +266,30 @@ def render_batches(title, records, official_data, fixtures,
             for n in range(0, len(validated), 3)]
 
 
+def _atomic_delivery_journal(path, contents):
+    """Replace the receipt journal atomically without discarding old receipts."""
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(contents, sort_keys=True))
+    temporary.replace(path)
+
+
 def receipt_send(images, caption, identity, webhook_url, journal_path, *,
                  session=None):
-    """Send all pages as one Discord message, receipt-check and dedup."""
+    """Serialize local callers before inspecting the durable delivery journal."""
+    journal_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = journal_path.with_suffix(".delivery.lock")
+    with lock_path.open("a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            return _receipt_send_unlocked(images, caption, identity, webhook_url,
+                                          journal_path, session=session)
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _receipt_send_unlocked(images, caption, identity, webhook_url, journal_path, *,
+                           session=None):
+    """One semantic payload, one confirmed webhook message or a durable hold."""
     try:
         from .publishing_window import assert_allowed
     except ImportError:
@@ -282,8 +304,21 @@ def receipt_send(images, caption, identity, webhook_url, journal_path, *,
         prior = json.loads(journal_path.read_text()) if journal_path.is_file() else {}
     except (OSError, ValueError) as exc:
         raise RuntimeError("Cannot safely read prior Discord receipt ledger") from exc
-    if identity in prior and prior[identity].get("message_id"):
-        return prior[identity]["message_id"], False
+    if not isinstance(prior, dict) or any(not isinstance(v, dict) for v in prior.values()):
+        raise RuntimeError("Invalid Discord delivery journal; refusing unsafe replay")
+    if identity in prior:
+        if prior[identity].get("message_id"):
+            return prior[identity]["message_id"], False
+        if prior[identity].get("send_pending"):
+            raise RuntimeError("Previous Discord acceptance is uncertain; reconcile before retry")
+    # Same caption under a different version/ID is not a new post.
+    caption_digest = hashlib.sha256(" ".join(caption.split()).casefold().encode("utf-8")).hexdigest()
+    for old_entry in prior.values():
+        if old_entry.get("caption_sha256") == caption_digest:
+            if old_entry.get("message_id"):
+                return old_entry["message_id"], False
+            if old_entry.get("send_pending"):
+                raise RuntimeError("Matching Discord caption is pending; refusing duplicate")
     buffers = []
     try:
         files = []
@@ -297,6 +332,13 @@ def receipt_send(images, caption, identity, webhook_url, journal_path, *,
         payload = {"payload_json": json.dumps({
             "username": "FPL VORTEX", "content": caption,
             "allowed_mentions": {"parse": []}})}
+        # Checkpoint BEFORE making a remote request. A lost response or runner
+        # crash must not cause a blind second Discord webhook submission.
+        prior[identity] = {
+            "send_pending": True, "caption_sha256": caption_digest,
+            "started_at": datetime.now(timezone.utc).isoformat(), "pages": len(images)
+        }
+        _atomic_delivery_journal(journal_path, prior)
         # HTTP 429 is a confirmed rate-limit rejection, so bounded retry
         # is safe. Never blindly retry unknown network/5xx acceptance.
         from time import sleep
@@ -308,22 +350,27 @@ def receipt_send(images, caption, identity, webhook_url, journal_path, *,
             if getattr(response, "status_code", 200) != 429:
                 break
             if attempt == 2:
+                # Confirmed 429 means the webhook did not accept this message.
+                prior.pop(identity, None)
+                _atomic_delivery_journal(journal_path, prior)
                 raise RuntimeError("Discord rate limit persisted; no post confirmed")
             try:
                 retry_after = float(response.headers.get("Retry-After", "1"))
             except (ValueError, TypeError, AttributeError):
                 retry_after = 1.0
             sleep(max(0.5, min(retry_after, 5.0)))
+        if 400 <= getattr(response, "status_code", 200) < 500:
+            # 4xx (apart from 429 handled above) is a confirmed rejection.
+            prior.pop(identity, None)
+            _atomic_delivery_journal(journal_path, prior)
         response.raise_for_status()
         message_id = response.json().get("id")
         if not message_id:
             raise RuntimeError("Discord did not return a verified message ID")
         prior[identity] = {"message_id": str(message_id), "version": identity,
                            "published_at": datetime.now(timezone.utc).isoformat(),
-                           "pages": len(images)}
-        tmp = journal_path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(prior, sort_keys=True))
-        tmp.replace(journal_path)
+                           "caption_sha256": caption_digest, "pages": len(images)}
+        _atomic_delivery_journal(journal_path, prior)
         return str(message_id), True
     finally:
         for b in buffers:
