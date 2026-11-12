@@ -18,20 +18,37 @@ WIDTH, HEIGHT = 1440, 2160
 PAGE_SIZE = (WIDTH, HEIGHT)
 ROW_LIMIT = 10
 ROW_START, ROW_STEP, ROW_HEIGHT = 292, 169, 154
-NAVY = (252, 251, 247)
-PANEL = (255, 255, 255)
-PANEL_EDGE = (216, 212, 199)
-WHITE = (12, 16, 20)
-SECONDARY = (49, 54, 59)
-CYAN = (12, 16, 20)
-GOLD = (12, 16, 20)
-GREEN = (20, 110, 56)
-RED = (167, 43, 98)
+NAVY = (7, 13, 39)
+PANEL = (10, 25, 59)
+PANEL_EDGE = (40, 206, 248)
+WHITE = (239, 247, 255)
+SECONDARY = (164, 191, 223)
+CYAN = (23, 229, 249)
+GOLD = (255, 205, 82)
+GREEN = (67, 231, 136)
+RED = (244, 98, 145)
 FONT_BOLD = ("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf",
              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 FONT_NORMAL = ("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
+
+
+def _neon_page(key):
+    """Portrait-specific reference-1 palette, stable across retries."""
+    top = background_color(key)
+    bottom = (min(45, top[0] + 22), 8, min(86, top[2] + 38))
+    column = Image.new("RGB", (1, HEIGHT))
+    column.putdata([tuple(round(top[i] * (1-t) + bottom[i] * t)
+                          for i in range(3))
+                    for t in (y / (HEIGHT-1) for y in range(HEIGHT))])
+    canvas = column.resize(PAGE_SIZE)
+    frame = ImageDraw.Draw(canvas)
+    frame.rounded_rectangle((17, 17, WIDTH-18, HEIGHT-18), radius=26,
+                            outline=(144, 65, 252), width=5)
+    frame.line((25, 183, WIDTH-25, 183), fill=(23, 229, 249), width=5)
+    frame.line((25, 1994, WIDTH-25, 1994), fill=(144, 65, 252), width=4)
+    return canvas
 
 def _font(size: int, bold: bool = True):
     for path in FONT_BOLD if bold else FONT_NORMAL:
@@ -88,7 +105,7 @@ def row_rect(index):
 def _draw_player(canvas, draw, item, index, direction, assets):
     x1, y1, x2, y2 = row_rect(index)
     accent = GREEN if direction == "rise" else RED
-    shade = (196, 240, 208) if direction == "rise" else (250, 211, 231)
+    shade = (8, 57, 53) if direction == "rise" else (66, 18, 65)
     draw.rounded_rectangle((x1, y1, x2, y2), radius=17,
                            fill=PANEL, outline=PANEL_EDGE, width=3)
     draw.rounded_rectangle((x1, y1 + 9, x1 + 11, y2 - 9),
@@ -139,7 +156,7 @@ def render_price_pages(rises, falls, date_text, source_label, assets=None,
     for direction, entries in (("rise", rises), ("drop", falls)):
         if not entries:
             continue
-        canvas = Image.new("RGB", PAGE_SIZE, background_color(f"{date_text}|{direction}"))
+        canvas = _neon_page(f"{date_text}|{direction}")
         draw = ImageDraw.Draw(canvas)
         _image_within(canvas, logo, (42, 27, 192, 160))
         _line(draw, "PRICE CHANGE PREDICTIONS", (216, 41),
