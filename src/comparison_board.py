@@ -11,15 +11,15 @@ try:
 except ImportError:
     from minimal_theme import background, action_fill, social_footer
 
-STYLE_VERSION = "minimal-paper-action-fills-v2"
+STYLE_VERSION = "vortex-neon-navy-v3"
 SIZE = (1536, 864)
-TABLE_YELLOW = (255, 255, 255)
-TABLE_INK = (12, 16, 20)
-TABLE_RULE = (216, 212, 199)
-GOLD = (176, 139, 42)
-CYAN = (30, 150, 157)
-WHITE = (12, 16, 20)
-NAVY = (255, 255, 255, 255)
+TABLE_YELLOW = (10, 25, 60)
+TABLE_INK = (239, 247, 255)
+TABLE_RULE = (40, 193, 246)
+GOLD = (255, 205, 82)
+CYAN = (23, 229, 249)
+WHITE = (239, 247, 255)
+NAVY = (9, 21, 52, 255)
 
 
 def font(size, bold=True):
@@ -34,7 +34,6 @@ def font(size, bold=True):
 
 
 def text(draw, value, x, y, width, size=23, color=WHITE, minimum=15, center=False):
-    color = TABLE_INK
     value = " ".join(str(value).split())
     while size > minimum and draw.textbbox((0, 0), value, font=font(size))[2] > width:
         size -= 1
@@ -80,7 +79,7 @@ def contain(canvas, source, box, *, bottom=False, crop_alpha=False):
 
 def panel(draw, box, accent=GOLD):
     x0, y0, x1, y1 = box
-    draw.rounded_rectangle(box, radius=20, fill=NAVY, outline=TABLE_RULE, width=2)
+    draw.rounded_rectangle(box, radius=20, fill=NAVY, outline=(*accent, 255), width=2)
 
 
 def compact_table(draw, rows, box):
@@ -159,7 +158,7 @@ def comparison_board(master, title, gw, players, *, verdict=""):
     text(draw, title.upper(), 302, 4, 1035, 40, WHITE, 23, center=True)
     text(draw, "FORM • MINUTES • FIXTURE • VALUE", 385, 47, 900, 18, CYAN, center=True)
     draw.polygon([(680, 78), (856, 78), (846, 115), (670, 115)], fill=GOLD, outline=(255, 240, 180))
-    text(draw, f"GW{gw}", 686, 78, 148, 30, TABLE_INK, center=True)
+    text(draw, f"GW{gw}", 686, 78, 148, 30, (8, 17, 39), center=True)
     gap = 14
     width = (1460-gap*(len(players)-1))/len(players)
     for n, player in enumerate(players):
@@ -171,7 +170,7 @@ def comparison_board(master, title, gw, players, *, verdict=""):
             # Four equal columns: no portrait/table squeeze or clipped names.
             draw.rounded_rectangle((x0+12, 132, x1-12, 161), radius=4, fill=action_fill(player['action']))
             text(draw, player.get('label') or player['action'], x0+18, 134,
-                 width-36, 25, TABLE_INK, 18, center=True)
+                 width-36, 25, (8, 17, 39), 18, center=True)
             text(draw, player['name'].upper(), x0+16, 168, width-32, 32, WHITE, 23, center=True)
             text(draw, f"{player['club']} • {player['position']}", x0+14, 203,
                  width-28, 17, WHITE, 15, center=True)
@@ -193,7 +192,7 @@ def comparison_board(master, title, gw, players, *, verdict=""):
         ribbon_x = max(x0+18, detail_x-18)
         draw.polygon([(ribbon_x+9, 133), (x1-18, 133), (x1-27, 166), (ribbon_x, 166)], fill=action_fill(player['action']))
         label = player.get("label") or player["action"]
-        text(draw, label.upper(), ribbon_x+12, 138, x1-ribbon_x-43, 21, TABLE_INK, 14, center=True)
+        text(draw, label.upper(), ribbon_x+12, 138, x1-ribbon_x-43, 21, (8, 17, 39), 14, center=True)
         text(draw, player["name"].upper(), detail_x, 179, detail_w-65, 34, WHITE, 18)
         text(draw, f"{player['club']} • {player['position']}", detail_x, 224, detail_w, 17, WHITE, 14)
         metrics = player["metrics"]

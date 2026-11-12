@@ -22,19 +22,33 @@ LOGO_FILE = Path("logo.png")
 
 WIDTH = 1600
 
-BACKGROUND = (255, 251, 218)
-CARD = (255, 253, 225)
-ROW = (255, 253, 225)
-BORDER = (210, 205, 165)
+BACKGROUND = (7, 13, 39)
+CARD = (10, 26, 62)
+ROW = (10, 26, 62)
+BORDER = (43, 205, 247)
 
-WHITE = (20, 20, 20)
-MUTED = (70, 70, 70)
-PLAYER_COLOR = (24, 55, 110)
-BLACK = (0, 0, 0)
+WHITE = (240, 247, 255)
+MUTED = (163, 190, 225)
+PLAYER_COLOR = (42, 225, 251)
+BLACK = (240, 247, 255)
 
 RED = (222, 55, 55)
 YELLOW = (235, 185, 45)
 GREEN = (55, 184, 100)
+
+
+def _neon_injury_canvas(height):
+    """Only the graphic backdrop changes; original injury content is retained."""
+    top = (5, 12, 37)
+    bottom = (37, 11, 78)
+    column = Image.new("RGBA", (1, height))
+    column.putdata([tuple(round(top[i]*(1-t) + bottom[i]*t) for i in range(3))+(255,)
+                    for t in (y/max(1,height-1) for y in range(height))])
+    canvas = column.resize((WIDTH, height))
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    draw.rounded_rectangle((11, 11, WIDTH-12, height-12),
+                           radius=22, outline=(155, 66, 249, 255), width=4)
+    return canvas
 
 FDR_COLORS = {
     1: (64, 190, 105),
@@ -661,11 +675,7 @@ def create_card(
         + 20
     )
 
-    canvas = Image.new(
-        "RGBA",
-        (WIDTH, height),
-        BACKGROUND + (255,),
-    )
+    canvas = _neon_injury_canvas(height)
 
     draw = ImageDraw.Draw(canvas)
 
@@ -680,7 +690,7 @@ def create_card(
             WIDTH,
             header_height,
         ),
-        fill=style["header"] + (255,),
+        fill=(9, 22, 54, 255),
     )
 
     # Larger real FPL Vortex logo.
@@ -741,7 +751,7 @@ def create_card(
             88,
         ),
         radius=14,
-        fill=(255, 255, 255, 235),
+        fill=(9, 22, 54, 255),
     )
 
     draw.text(
@@ -1181,7 +1191,7 @@ def create_card(
             WIDTH,
             height,
         ),
-        fill=(190, 255, 205, 255),
+        fill=(9, 22, 54, 255),
     )
 
     footer_font = fit_font(
@@ -1295,11 +1305,11 @@ def create_news_page(grouped_players, gameweek):
         )
         + footer_height
     )
-    canvas = Image.new("RGBA", (WIDTH, height), BACKGROUND + (255,))
+    canvas = _neon_injury_canvas(height)
     draw = ImageDraw.Draw(canvas)
 
     # Keep one main header and one gameweek badge for the complete update.
-    draw.rectangle((0, 0, WIDTH, header_height), fill=GREEN + (255,))
+    draw.rectangle((0, 0, WIDTH, header_height), fill=(9, 22, 54, 255))
     paste_contain(canvas, load_logo(), (25, 8, 165, 112))
     title = "FPL VORTEX • INJURY NEWS"
     title_font = fit_font(draw, title, 1050, 58, min_size=32, bold=True)
@@ -1310,7 +1320,7 @@ def create_news_page(grouped_players, gameweek):
     draw.rounded_rectangle(
         (WIDTH - gw_width - 65, 35, WIDTH - 25, 88),
         radius=14,
-        fill=(255, 255, 255, 235),
+        fill=(9, 22, 54, 255),
     )
     draw.text(
         (WIDTH - gw_width - 45, 43), gw_text, font=gw_font, fill=BLACK
@@ -1320,7 +1330,7 @@ def create_news_page(grouped_players, gameweek):
     for category, players in sections:
         y += section_gap
         style = CATEGORY_STYLE[category]
-        draw.rectangle((0, y, WIDTH, y + subheader_height), fill=GREEN + (255,))
+        draw.rectangle((0, y, WIDTH, y + subheader_height), fill=(9, 22, 54, 255))
         subtitle = f"{style['symbol']} {style['label']}"
         subtitle_font = fit_font(draw, subtitle, 760, 42, min_size=28, bold=True)
         draw.text((30, y + 12), subtitle, font=subtitle_font, fill=BLACK)
@@ -1346,7 +1356,7 @@ def create_news_page(grouped_players, gameweek):
         y += row_area.height
 
     draw.rectangle(
-        (0, height - footer_height, WIDTH, height), fill=(190, 255, 205, 255)
+        (0, height - footer_height, WIDTH, height), fill=(9, 22, 54, 255)
     )
     footer_text = "FPL VORTEX  •  Official FPL Data  •  #FPL #FPLNews #FPLInjury"
     if "SUSPENSION" in grouped_players:

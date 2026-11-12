@@ -16,21 +16,21 @@ def profile(name="Example"):
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 4])
-def test_minimal_paper_black_ink_and_action_ribbons(count):
+def test_neon_navy_panels_white_ink_and_action_ribbons(count):
     original = Image.new("RGB", board.SIZE, (11, 30, 51))
     players = [profile(f"Verified Player {i}") for i in range(count)]
     for p, action in zip(players, ('START', 'HOLD', 'MONITOR', 'HOLD')):
         p['action'] = p['label'] = action
     image = board.comparison_board(original, "CURRENT PLAYER PICKS", 10, players)
     assert image.size == board.SIZE
-    assert min(image.getpixel((0, 400))) > 235
+    assert max(image.getpixel((0, 400))) < 100
     if count == 4:
         width = (1460-14*(count-1))/count
         for n, p in enumerate(players):
             x = round(38+n*(width+14))
             assert image.getpixel((x+20, 150)) == board.action_fill(p['action'])
-    assert image.getpixel((48, 520)) == (255,255,255)
-    assert board.TABLE_INK == (12,16,20)
+    assert image.getpixel((48, 520)) == board.TABLE_YELLOW
+    assert min(board.TABLE_INK) >= 230
 
 
 def test_background_varies_by_edition_but_retry_is_stable():
