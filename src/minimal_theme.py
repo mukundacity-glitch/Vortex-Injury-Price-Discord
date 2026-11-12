@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 INK = (232, 244, 255)
 MUTED = (168, 196, 226)
-PAPER = (8, 15, 40)
+PAPER = (7, 14, 38)
 RULE = (29, 207, 246)
 CYAN = (0, 226, 248)
 GOLD = (255, 204, 64)
